@@ -386,5 +386,54 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
             % 有许可证：未加载模型必须报错
             tc.assertThrows(@() slExportWebView('NoSuchModel_XYZ'));
         end
+
+        function testZeroArgInvocations(tc)
+            % 3.1.0 回归测试：零参调用路径（依赖 gcs）。
+            % 背景：迁移 +simutidy 包时 nargin 守卫被误搬进 resolveSystem，
+            % 零参调用在传参点即抛"输入参数的数目不足"（用户报告的
+            % Tools 菜单/Toolstrip 全挂就是这个）。本用例锁定修复。
+            % 前提：gcs 必须指向测试模型（open_system 会设置）
+            mdl = tc.ModelName;
+            tc.addAndConnect([100 100 140 140], [500 100 540 140]);
+            open_system(mdl);
+            tc.verifyEqual(gcs, mdl, 'gcs 未指向测试模型，零参测试前提不成立');
+
+            % 零参对齐（全选）
+            hl = find_system(mdl, 'FindAll', 'on', 'Type', 'block');
+            for h = hl(:)'
+                set_param(h, 'Selected', 'on');
+            end
+            slAlignBlocks();
+            pA = get_param([mdl '/GainA'], 'Position');
+            pB = get_param([mdl '/GainB'], 'Position');
+            tc.verifyEqual(pA(1), pB(1), '零参左对齐未生效');
+
+            % 零参拆分（选线）
+            tc.selectLines();
+            slSplitGotoFrom();
+            tc.verifyEqual(numel(find_system(mdl, 'SearchDepth', 1, ...
+                'Type', 'block')), 4, '零参拆分未生效');
+
+            % 零参高亮 / 信号对象解析 / 端口对齐（只要求不抛"输入参数不足"）
+            slHighlightUnconnected();
+            slSetSignalResolve();
+            set_param([mdl '/GainB'], 'Selected', 'on');
+            slAlignLinePorts();
+
+            % 零参命名 + 大小统一（选 2 块）
+            tc.selectBlocks({'GainA', 'GainB'});
+            slAutoNameSignals();
+            lines = find_system(mdl, 'FindAll', 'on', 'Type', 'line');
+            names = get_param(lines, 'Name');
+            tc.verifyTrue(any(strcmp(names, 'GainA')), '零参命名未生效');
+            slUniformSize();
+            % 注意比尺寸不比位置：上面的零参拆分会自动推块，A/B 位置本来
+            % 就不同；大小统一的契约是"尺寸一致、中心不变"
+            pA2 = get_param([mdl '/GainA'], 'Position');
+            pB2 = get_param([mdl '/GainB'], 'Position');
+            sA = [pA2(3) - pA2(1), pA2(4) - pA2(2)];
+            sB = [pB2(3) - pB2(1), pB2(4) - pB2(2)];
+            tc.verifyEqual(sA, sB, '零参大小统一未生效');
+        end
     end
 end

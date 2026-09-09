@@ -8,6 +8,12 @@ function autoNameSignals(sys, mode)
 %       'clear'       - 清除所有信号线命名
 %   兼容：根目录 slAutoNameSignals.m 为薄包装，行为契约不变
 
+    % nargin 守卫必须在把 sys 传入 resolveSystem **之前**（原因见
+    % simutidy/alignBlocks.m 入口注释：零参调用时 sys 未定义，
+    % 作实参直接抛"输入参数的数目不足"）
+    if nargin < 1
+        sys = gcs;
+    end
     sysPath = simutidy.internal.resolveSystem(sys);
     if nargin < 2 || isempty(mode)
         mode = 'source';

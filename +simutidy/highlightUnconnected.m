@@ -15,6 +15,11 @@ function highlightUnconnected(sys, clearFlag)
 %   为当前层（见下），扫描本身的收益保留
 %   兼容：根目录 slHighlightUnconnected.m 为薄包装，行为契约不变
 
+    % nargin 守卫必须在最顶部：零参调用时 sys 未定义，而 clearFlag 分支
+    % 与 resolveSystem 都要用到它（原因详见 simutidy/alignBlocks.m 入口注释）
+    if nargin < 1
+        sys = gcs;
+    end
     if nargin < 2
         clearFlag = false;
     end

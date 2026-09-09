@@ -14,6 +14,14 @@ function alignBlocks(sys, alignType)
 %         基准模块位置不变。
 %   兼容：根目录 slAlignBlocks.m 为薄包装，行为契约不变
 
+    % nargin 守卫必须在把 sys 传入 resolveSystem **之前**：
+    % 未传参时 sys 是"未定义变量"，直接作实参会在调用点抛
+    % "输入参数的数目不足"，永远走不到 resolveSystem 内部的空值分支。
+    % （3.1.0 迁移引入的回归：守卫曾随样板一起搬进 resolveSystem，
+    % 导致 Tools 菜单/Toolstrip 的零参调用全部报错，已修复并补回归测试）
+    if nargin < 1
+        sys = gcs;
+    end
     % 3.1.0 收敛：sys 校验样板统一走 internal.resolveSystem（原 8 处复制粘贴）
     sysPath = simutidy.internal.resolveSystem(sys);
     if nargin < 2 || isempty(alignType)

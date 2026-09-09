@@ -14,6 +14,12 @@ function alignLinePorts(sys)
 %       - 单个失败不影响其他，最后汇总报告
 %   兼容：根目录 slAlignLinePorts.m 为薄包装，行为契约不变
 
+    % nargin 守卫必须在把 sys 传入 resolveSystem **之前**（原因见
+    % simutidy/alignBlocks.m 入口注释：零参调用时 sys 未定义，
+    % 作实参直接抛"输入参数的数目不足"）
+    if nargin < 1
+        sys = gcs;
+    end
     % 3.1.0 收敛：sys 校验样板统一走 internal.resolveSystem
     sysPath = simutidy.internal.resolveSystem(sys);
 

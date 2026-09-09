@@ -16,6 +16,12 @@ function splitGotoFrom(sys)
 %   3.1.0 修复说明：add_line 改用端口句柄连接（原实现用块名拼路径，
 %   块名含 '/' 时路径解析必然失败；端口句柄不受名称影响）
 
+    % nargin 守卫必须在把 sys 传入 resolveSystem **之前**（原因见
+    % simutidy/alignBlocks.m 入口注释：零参调用时 sys 未定义，
+    % 作实参直接抛"输入参数的数目不足"）
+    if nargin < 1
+        sys = gcs;
+    end
     sysPath = simutidy.internal.resolveSystem(sys);
 
     selectedObjs = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'line');
