@@ -7,7 +7,7 @@ function cfg = SimuTidy_config()
     persistent warnedBad   % 用户配置解析失败的"只告警一次"标志（函数顶部声明）
 
     %% 版本信息
-    cfg.version = '3.3.0';
+    cfg.version = '3.3.1';
     cfg.versionDate = '2026-09-09';
     
     %% Goto/From模块配置
@@ -22,7 +22,9 @@ function cfg = SimuTidy_config()
     cfg.naming.replaceWith = '_';
     
     %% GUI配置
-    cfg.gui.mainPosition = [500, 120, 460, 620];
+    % 3.3.1：默认高度 620→700——gridlayout 各固定行高合计需要 ~660px，
+    % 620 会裁掉底部"检查与诊断"分区
+    cfg.gui.mainPosition = [500, 60, 460, 700];
     % 3.1.0 清理：原 cfg.gui.alignDialogPos 已随死代码 SimuTidy_alignDialog
     % 一并删除（该对话框无任何调用方，主窗口自带对齐按钮组）
     cfg.gui.nameDialogPos = [520, 360, 320, 300];

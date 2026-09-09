@@ -31,8 +31,10 @@
 
     g = uigridlayout(fig);
     g.ColumnWidth = {'1x'};
-    % 行高固定值：分区视觉密度与旧版一致；窗口变高时行间距不变
-    g.RowHeight = {26, 20, 78, 158, 128, 82, 82, 20, 20};
+    % 3.3.1 行高经验值：必须给足余量——uifigure 在高 DPI 下控件最小尺寸
+    % 变大，行高压到最小值以下时按钮会被裁成细条（用户实测截图反馈：
+    % 标题行 26px 裁字、"连线整理"第二行被挤扁）
+    g.RowHeight = {34, 20, 72, 162, 118, 72, 72, 20, 24};
     g.RowSpacing = 6;
     g.ColumnSpacing = 8;
     g.Padding = [8, 8, 8, 8];
@@ -42,7 +44,7 @@
     top.Layout.Row = 1;
     top.Layout.Column = 1;
     top.ColumnWidth = {'1x', 76, 78};
-    top.RowHeight = {24};
+    top.RowHeight = {30};
 
     uilabel(top, 'Text', 'SimuTidy Simulink 辅助工具', ...
         'FontSize', 15, 'FontWeight', 'bold', 'FontColor', cfg.colors.text, ...
@@ -74,7 +76,8 @@
     p1.Layout.Row = 3;
     pg1 = uigridlayout(p1);
     pg1.ColumnWidth = {'1x'};
-    pg1.RowHeight = {32};
+    pg1.RowHeight = {34};
+    pg1.RowSpacing = 8;
     pg1.Padding = [6, 6, 6, 6];
 
     uibutton(pg1, 'push', 'Text', '导出 Web 视图 (ZIP)', ...
@@ -89,8 +92,9 @@
         'ForegroundColor', cfg.colors.panelTitle, 'FontWeight', 'bold');
     p2.Layout.Row = 4;
     pg2 = uigridlayout(p2);
-    pg2.RowHeight = {32, 32, 32};
+    pg2.RowHeight = {34, 34, 34};
     pg2.ColumnWidth = {'1x', '1x', '1x', '1x'};
+    pg2.RowSpacing = 8;
     pg2.Padding = [6, 6, 6, 6];
 
     alignDefs = { ...
@@ -125,31 +129,42 @@
         'ForegroundColor', cfg.colors.panelTitle, 'FontWeight', 'bold');
     p3.Layout.Row = 5;
     pg3 = uigridlayout(p3);
-    pg3.RowHeight = {32, 32};
-    pg3.ColumnWidth = {'1x'};
+    % 3.3.1 拍平嵌套：此前第二行用了嵌套 grid，被外层固定行高挤压成
+    % 细条（嵌套自身的 Padding/最小尺寸吃掉了 32px 行）。改为单层
+    % 2 行网格：第一行跨 3 列，第二行 3 个按钮
+    pg3.RowHeight = {34, 34};
+    pg3.ColumnWidth = {'1x', '1x', '1x'};
+    pg3.RowSpacing = 8;
     pg3.Padding = [6, 6, 6, 6];
 
-    uibutton(pg3, 'push', 'Text', '连线端口对齐', ...
+    bPort = uibutton(pg3, 'push', 'Text', '连线端口对齐', ...
         'FontSize', 12, 'FontWeight', 'bold', ...
         'BackgroundColor', cfg.colors.lineDark, 'FontColor', [1 1 1], ...
         'Tooltip', '以选中模块连线的另一端端口为基准（不动），垂直移动选中模块使端口同高，连线变为水平直线（只调垂直位置，不改水平位置）', ...
         'ButtonPushedFcn', @(~,~) onAlignLinePorts(fig));
+    bPort.Layout.Row = 1;
+    bPort.Layout.Column = [1, 3];
 
-    rowB = uigridlayout(pg3);
-    rowB.Layout.Row = 2;
-    rowB.ColumnWidth = {'1x', '1x', '1x'};
-    uibutton(rowB, 'push', 'Text', '信号线命名', ...
+    bName = uibutton(pg3, 'push', 'Text', '信号线命名', ...
         'FontSize', 11, 'BackgroundColor', cfg.colors.line, 'FontColor', [1 1 1], ...
         'Tooltip', '打开命名对话框：按源模块名/源模块名+端口号/输出端口命名信号线，或清除命名', ...
         'ButtonPushedFcn', @(~,~) SimuTidy_nameDialog(fig));
-    uibutton(rowB, 'push', 'Text', '拆分 Goto/From', ...
+    bName.Layout.Row = 2;
+    bName.Layout.Column = 1;
+
+    bSplit = uibutton(pg3, 'push', 'Text', '拆分 Goto/From', ...
         'FontSize', 11, 'BackgroundColor', cfg.colors.line, 'FontColor', [1 1 1], ...
         'Tooltip', '将选中的长连线批量拆分为Goto/From对（支持多选；Goto在源端、From在目标端，两端模块外移留出间距）', ...
         'ButtonPushedFcn', @(~,~) onSplitGoto(fig));
-    uibutton(rowB, 'push', 'Text', '信号对象解析', ...
+    bSplit.Layout.Row = 2;
+    bSplit.Layout.Column = 2;
+
+    bResolve = uibutton(pg3, 'push', 'Text', '信号对象解析', ...
         'FontSize', 11, 'BackgroundColor', cfg.colors.line, 'FontColor', [1 1 1], ...
         'Tooltip', '为当前层级所有有名字的信号线勾选"信号名称必须解析为Simulink对象"（更新图时强制校验名字指向工作区对象）；选中线则只处理选中的；mode off 可取消', ...
         'ButtonPushedFcn', @(~,~) onSetSignalResolve(fig));
+    bResolve.Layout.Row = 2;
+    bResolve.Layout.Column = 3;
 
     % ===== 行6：❹ 接口与命名 =====
     p4 = uipanel(g, 'Title', '  接口与命名  ', ...
@@ -157,8 +172,9 @@
         'ForegroundColor', cfg.colors.panelTitle, 'FontWeight', 'bold');
     p4.Layout.Row = 6;
     pg4 = uigridlayout(p4);
-    pg4.RowHeight = {32};
+    pg4.RowHeight = {34};
     pg4.ColumnWidth = {'1x', '1x'};
+    pg4.RowSpacing = 8;
     pg4.Padding = [6, 6, 6, 6];
 
     uibutton(pg4, 'push', 'Text', '生成接口', ...
@@ -176,8 +192,9 @@
         'ForegroundColor', cfg.colors.panelTitle, 'FontWeight', 'bold');
     p5.Layout.Row = 7;
     pg5 = uigridlayout(p5);
-    pg5.RowHeight = {32};
+    pg5.RowHeight = {34};
     pg5.ColumnWidth = {'1x'};
+    pg5.RowSpacing = 8;
     pg5.Padding = [6, 6, 6, 6];
 
     uibutton(pg5, 'push', 'Text', '高亮未连接端口', ...
@@ -195,6 +212,10 @@
     foot = uigridlayout(g);
     foot.Layout.Row = 9;
     foot.ColumnWidth = {'1x', 64};
+    % 3.3.1：嵌套网格必须显式给行高并收紧 Padding，否则内部按钮被
+    % 默认值挤成 0 高（实测"设置"按钮不可见）
+    foot.RowHeight = {24};
+    foot.Padding = [0, 0, 0, 0];
     uilabel(foot, 'Text', '开发者: Henry  |  1378099981@qq.com  |  github.com/zyd180', ...
         'FontSize', 8, 'FontColor', cfg.colors.textFaint, ...
         'HorizontalAlignment', 'center');
@@ -390,7 +411,9 @@ function pos = loadWindowPos(cfg)
         if isnumeric(p) && numel(p) == 4 && all(isfinite(p))
             ss = get(0, 'ScreenSize');
             p(3) = min(max(p(3), 420), ss(3));      % 最小宽 420
-            p(4) = min(max(p(4), 620), ss(4));      % 最小高 620
+            % 3.3.1：最小高抬到 700——gridlayout 固定行高合计 ~660，
+            % 旧版记忆的 620 会裁掉底部；用旧偏好的用户被自动抬到可用高度
+            p(4) = min(max(p(4), 700), ss(4));
             p(1) = min(max(p(1), 80 - p(3)), ss(3) - 80);
             p(2) = min(max(p(2), 40 - p(4)), ss(4) - 40);
             pos = p;
