@@ -1,39 +1,23 @@
-function slUniformSize(sys, mode)
-%slUniformSize 统一选中模块的大小
-%   slUniformSize() - 以基准模块为准统一大小
-%   slUniformSize(sys) - 指定子系统
-%   slUniformSize(sys, mode) - 指定模式
+function uniformSize(sys, mode)
+%uniformSize 统一选中模块的大小（3.1.0 自 core/slUniformSize 迁入 +simutidy 包）
+%   simutidy.uniformSize() - 以基准模块为准统一大小
+%   simutidy.uniformSize(sys, mode) - 指定模式：base/max/min/avg
 %
-%   输入：
-%       sys - 子系统路径或句柄（可选，默认当前子系统）
-%       mode - 统一模式：
-%           'base' - 以基准模块（最上方最左）为准（默认）
-%           'max'  - 以最大宽高为准
-%           'min'  - 以最小宽高为准
-%           'avg'  - 以平均宽高为准
-%
-%   功能：
-%       统一所有选中模块的大小，保持中心点不变
+%   功能：统一所有选中模块的大小，保持中心点不变
+%   兼容：根目录 slUniformSize.m 为薄包装，行为契约不变
 
-    if nargin < 1 || isempty(sys)
-        sys = gcs;
-    end
-    
+    sysPath = simutidy.internal.resolveSystem(sys);
     if nargin < 2 || isempty(mode)
         mode = 'base';
     end
-    
-    if isempty(sys) || ~ishandle(get_param(sys, 'Handle'))
-        error('无效的子系统句柄或路径。');
-    end
 
-    selectedObjs = find_system(sys, 'FindAll', 'on', 'Selected', 'on', 'Type', 'block');
+    selectedObjs = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'block');
     if length(selectedObjs) < 2
-        error('请至少选中 2 个模块。');
+        error('SimuTidy:tooFewBlocks', '请至少选中 2 个模块。');
     end
 
     n = length(selectedObjs);
-    % 3.1.0 性能优化：位置批量读取（同 slAlignBlocks，1 次 API 调用替代 N 次）
+    % 3.1.0 性能优化：位置批量读取（同 simutidy.alignBlocks，1 次 API 调用替代 N 次）
     positions = cell2mat(get_param(selectedObjs, 'Position'));
 
     widths  = positions(:, 3) - positions(:, 1);
@@ -76,5 +60,5 @@ function slUniformSize(sys, mode)
         mode, targetW, targetH, n);
 
     % 3.1.0 性能优化：移除 update——纯几何改尺寸后 Simulink 自动重排连线，
-    % 编译刷新浪费整模型编译时间（理由详见 slAlignBlocks 同名注释）
+    % 编译刷新浪费整模型编译时间（理由详见 simutidy/alignBlocks.m 同名注释）
 end

@@ -1,24 +1,29 @@
-function slGeneratePorts(sys)
-%slGeneratePorts 为选中的Subsystem自动生成接口
-%
-%   用法：
-%       slGeneratePorts()    - 为当前选中的Subsystem生成端口
-%       slGeneratePorts(sys) - 为指定Subsystem生成端口
+function generatePorts(sys)
+%generatePorts 为选中的Subsystem自动生成接口
+%   （3.1.0 自 core/slGeneratePorts 迁入 +simutidy 包）
+%   simutidy.generatePorts()    - 为当前选中的Subsystem生成端口
+%   simutidy.generatePorts(sys) - 为指定Subsystem生成端口
 %
 %   功能：
 %       检测Subsystem未连接的输入/输出端口
 %       自动添加对应的Inport/Outport块并连线
-%       块名称固定显示为信号名称（Inport1/Outport1...）
+%       块名称固定显示为信号名称（InportN/OutportN...）
+%
+%   已知怪癖（3.1.0 锁定现状，未修）：新块序号 = 子系统内同类型块数 +
+%   端口号，端口不连续时会产生跳号；有 getSimulinkBlockHandle 判重兜底
+%   不会崩溃，仅观感问题。若未来修正编号规则，须同步更新回归测试
+%   testGeneratePorts 中锁定的预期值
+%   兼容：根目录 slGeneratePorts.m 为薄包装，行为契约不变
 %
 %   颜色配置（Simulink仅支持预定义颜色名，用户可自行修改下方值）：
-%       Inport:  'cyan'
-%       Outport: 'magenta'
+%       Inport:  'lightBlue'
+%       Outport: '[1, 0.333, 1]'
 
     % ========== 参数处理 ==========
     if nargin < 1 || isempty(sys)
         sel = gcb;
         if isempty(sel)
-            error('请先选中一个Subsystem模块。');
+            error('SimuTidy:noSelection', '请先选中一个Subsystem模块。');
         end
         sys = getfullname(sel);
     end
@@ -26,7 +31,7 @@ function slGeneratePorts(sys)
     % ========== 验证Subsystem ==========
     blockType = get_param(sys, 'BlockType');
     if ~strcmp(blockType, 'SubSystem')
-        error('选中的模块不是Subsystem。');
+        error('SimuTidy:notSubsystem', '选中的模块不是Subsystem。');
     end
 
     sysPath = get_param(sys, 'Parent');
@@ -121,6 +126,8 @@ function slGeneratePorts(sys)
     end
 
     % ========== 更新模型 ==========
+    % 本操作保留 update：新增端口必须编译后才在模型中生效（端口结构
+    % 变化），与纯几何操作的去 update 理由不同
     try
         set_param(sysPath, 'SimulationCommand', 'update');
     catch

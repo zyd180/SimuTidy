@@ -1,41 +1,26 @@
-function slAutoNameSignals(sys, mode)
-%slAutoNameSignals 信号线自动命名
-%   slAutoNameSignals() - 按源模块名命名当前子系统的信号线
-%   slAutoNameSignals(sys) - 指定子系统
-%   slAutoNameSignals(sys, mode) - 指定命名模式
-%
-%   输入：
-%       sys - 子系统路径或句柄（可选，默认当前子系统）
-%       mode - 命名模式：
-%           'source'      - 按源模块名命名（默认）
-%           'source_port' - 按源模块名+端口号命名
-%           'outport'     - 按输出端口命名
-%           'clear'       - 清除所有信号线命名
-%
-%   功能：
-%       根据指定模式自动为信号线命名
+function autoNameSignals(sys, mode)
+%autoNameSignals 信号线自动命名（3.1.0 自 core/slAutoNameSignals 迁入 +simutidy 包）
+%   simutidy.autoNameSignals() - 按源模块名命名当前子系统的信号线
+%   simutidy.autoNameSignals(sys, mode) - 指定命名模式：
+%       'source'      - 按源模块名命名（默认）
+%       'source_port' - 按源模块名+端口号命名
+%       'outport'     - 按输出端口命名
+%       'clear'       - 清除所有信号线命名
+%   兼容：根目录 slAutoNameSignals.m 为薄包装，行为契约不变
 
-    if nargin < 1 || isempty(sys)
-        sys = gcs;
-    end
-    
+    sysPath = simutidy.internal.resolveSystem(sys);
     if nargin < 2 || isempty(mode)
         mode = 'source';
     end
-    
-    if isempty(sys) || ~ishandle(get_param(sys, 'Handle'))
-        error('无效的子系统句柄或路径。');
-    end
 
-    selectedObjs = find_system(sys, 'FindAll', 'on', 'Selected', 'on', 'Type', 'line');
+    selectedObjs = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'line');
     if isempty(selectedObjs)
-        lineHandles = find_system(sys, 'FindAll', 'on', 'Type', 'line');
+        lineHandles = find_system(sysPath, 'FindAll', 'on', 'Type', 'line');
     else
         lineHandles = selectedObjs;
     end
 
-    % 3.1.0 性能优化：cfg 调用提升到循环外。原实现在每条线的处理里都调
-    % SimuTidy_config()（N 次重复构造配置结构），纯浪费
+    % 3.1.0 性能优化：cfg 调用提升到循环外（原实现每条线构造一次配置）
     cfg = SimuTidy_config();
 
     namedCount = 0;
@@ -62,7 +47,9 @@ function slAutoNameSignals(sys, mode)
         srcBlockH = get_param(srcPortH, 'Parent');
         srcBlockName = get_param(srcBlockH, 'Name');
 
-        srcBlockName = regexprep(srcBlockName, cfg.naming.replaceChars, cfg.naming.replaceWith);
+        % 3.1.0 收敛：名称清洗统一走 internal.sanitizeName（原 3 处重复
+        % regexprep，规则只应有一处定义）
+        srcBlockName = simutidy.internal.sanitizeName(srcBlockName);
         portNum = get_param(srcPortH, 'PortNumber');
 
         switch mode
@@ -77,7 +64,7 @@ function slAutoNameSignals(sys, mode)
                     dstBlockType = get_param(dstBlockH, 'BlockType');
                     if strcmp(dstBlockType, 'Outport')
                         newName = get_param(dstBlockH, 'Name');
-                        newName = regexprep(newName, cfg.naming.replaceChars, cfg.naming.replaceWith);
+                        newName = simutidy.internal.sanitizeName(newName);
                     else
                         newName = srcBlockName;
                     end
@@ -96,6 +83,15 @@ function slAutoNameSignals(sys, mode)
     end
 
     fprintf('%s 完成，共处理 %d 条信号线。\n', ...
-        sltidy_iif(strcmp(mode,'clear'),'清除命名',sltidy_iif(strcmp(mode,'outport'),'按输出端口命名',sltidy_iif(strcmp(mode,'source_port'),'按源模块+端口命名','按源模块命名'))), ...
-        namedCount);
+        modeLabel(mode), namedCount);
+end
+
+function txt = modeLabel(mode)
+% 本函数内的模式文案（3.1.0 迁移时保留原输出格式不变）
+    switch mode
+        case 'clear',       txt = '清除命名';
+        case 'outport',     txt = '按输出端口命名';
+        case 'source_port', txt = '按源模块+端口命名';
+        otherwise,          txt = '按源模块命名';
+    end
 end

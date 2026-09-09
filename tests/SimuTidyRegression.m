@@ -15,9 +15,10 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
 
     methods (TestClassSetup)
         function addPathOnce(tc) %#ok<INUSD>
+            % 3.1.0 命名空间化后实体在 +simutidy 包内：包无需单独加路径，
+            % 根目录在 path 上即可；gui/utils 仍需单独 addpath
             addpath(tc.ROOT);
             addpath(fullfile(tc.ROOT, 'gui'));
-            addpath(fullfile(tc.ROOT, 'core'));
             addpath(fullfile(tc.ROOT, 'utils'));
         end
     end

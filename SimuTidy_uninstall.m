@@ -14,10 +14,10 @@ function SimuTidy_uninstall()
     % ========== 步骤1：从路径中移除 ==========
     fprintf('[1/3] 移除路径...\n');
     
+    % 3.1.0 命名空间化：core 目录已并入 +simutidy 包（随根目录），不再单独移除
     pathsToRemove = {
         rootPath
         fullfile(rootPath, 'gui')
-        fullfile(rootPath, 'core')
         fullfile(rootPath, 'utils')
     };
     

@@ -1,40 +1,28 @@
-function slAlignBlocks(sys, alignType)
-%slAlignBlocks 模块批量对齐与分布
-%   slAlignBlocks() - 左对齐当前子系统选中的模块
-%   slAlignBlocks(sys) - 左对齐指定子系统选中的模块
-%   slAlignBlocks(sys, alignType) - 指定对齐方式
+function alignBlocks(sys, alignType)
+%alignBlocks 模块批量对齐与分布（3.1.0 自 core/slAlignBlocks 迁入 +simutidy 包）
+%   simutidy.alignBlocks() - 左对齐当前子系统选中的模块
+%   simutidy.alignBlocks(sys) - 左对齐指定子系统选中的模块
+%   simutidy.alignBlocks(sys, alignType) - 指定对齐方式
 %
 %   输入：
 %       sys - 子系统路径或句柄（可选，默认当前子系统）
 %       alignType - 对齐方式：
-%           'left'     - 左对齐（默认）
-%           'right'    - 右对齐
-%           'top'      - 顶部对齐
-%           'bottom'   - 底部对齐
-%           'hcenter'  - 水平居中
-%           'vcenter'  - 垂直居中
-%           'hspace'   - 水平等间距
-%           'vspace'   - 垂直等间距
+%           'left'/'right'/'top'/'bottom'/'hcenter'/'vcenter'/
+%           'hspace'/'vspace'（默认 'left'）
 %
-%   功能：
-%       以最上方最左的模块为基准，调整其他模块位置实现对齐
-%       基准模块位置不变
+%   功能：以最上方最左的模块为基准，调整其他模块位置实现对齐；
+%         基准模块位置不变。
+%   兼容：根目录 slAlignBlocks.m 为薄包装，行为契约不变
 
-    if nargin < 1 || isempty(sys)
-        sys = gcs;
-    end
-    
+    % 3.1.0 收敛：sys 校验样板统一走 internal.resolveSystem（原 8 处复制粘贴）
+    sysPath = simutidy.internal.resolveSystem(sys);
     if nargin < 2 || isempty(alignType)
         alignType = 'left';
     end
-    
-    if isempty(sys) || ~ishandle(get_param(sys, 'Handle'))
-        error('无效的子系统句柄或路径。');
-    end
 
-    selectedObjs = find_system(sys, 'FindAll', 'on', 'Selected', 'on', 'Type', 'block');
+    selectedObjs = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'block');
     if length(selectedObjs) < 2
-        error('请至少选中 2 个模块。');
+        error('SimuTidy:tooFewBlocks', '请至少选中 2 个模块。');
     end
 
     n = length(selectedObjs);
@@ -132,7 +120,7 @@ function slAlignBlocks(sys, alignType)
                 end
             end
         otherwise
-            error('未知的对齐类型: %s', alignType);
+            error('SimuTidy:unknownAlignType', '未知的对齐类型: %s', alignType);
     end
 
     % 3.1.0 性能优化：目标位置与现位置相同的块跳过写入（幂等，重复操作

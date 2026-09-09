@@ -225,7 +225,10 @@ function doAlign(fig, alignType)
     drawnow;
 
     try
-        slAlignBlocks([], alignType);
+        % 3.1.0 命名空间化：以下回调统一改调 +simutidy 包实体（core/sl* 已迁移）。
+    % 经由根目录 slXxx 兼容包装亦可工作，但 GUI 属内部调用方，直调包函数
+    % 少一层间接；slXxx 包装仅供外部脚本与 sl_customization 菜单使用
+    simutidy.alignBlocks([], alignType);
         sl.Text = [alignNames.(alignType) '完成'];
         sl.FontColor = cfg.colors.success;
     catch ME
@@ -242,7 +245,7 @@ function onExportWebView(fig)
     cfg = SimuTidy_config();
     sl.Text = '正在导出...'; sl.FontColor = cfg.colors.export; drawnow;
     try
-        zipFile = slExportWebView();
+        zipFile = simutidy.exportWebView();
         [~, n, e] = fileparts(zipFile);
         sl.Text = ['导出成功: ' n e]; sl.FontColor = cfg.colors.success;
     catch ME
@@ -255,7 +258,7 @@ function onAlignLinePorts(fig)
     cfg = SimuTidy_config();
     sl.Text = '正在端口对齐...'; sl.FontColor = cfg.colors.lineDark; drawnow;
     try
-        slAlignLinePorts();
+        simutidy.alignLinePorts();
         sl.Text = '连线端口对齐完成';
         sl.FontColor = cfg.colors.success;
     catch ME
@@ -268,7 +271,7 @@ function onUniformSize(fig)
     cfg = SimuTidy_config();
     sl.Text = '正在统一大小...'; sl.FontColor = cfg.colors.moduleDark; drawnow;
     try
-        slUniformSize();
+        simutidy.uniformSize();
         sl.Text = '大小统一完成';
         sl.FontColor = cfg.colors.success;
     catch ME
@@ -281,7 +284,7 @@ function onSplitGoto(fig)
     cfg = SimuTidy_config();
     sl.Text = '正在拆分...'; sl.FontColor = cfg.colors.line; drawnow;
     try
-        slSplitGotoFrom();
+        simutidy.splitGotoFrom();
         sl.Text = '拆分完成';
         sl.FontColor = cfg.colors.success;
     catch ME
@@ -294,7 +297,7 @@ function onHighlightUnconnected(fig)
     cfg = SimuTidy_config();
     sl.Text = '正在高亮...'; sl.FontColor = cfg.colors.check; drawnow;
     try
-        slHighlightUnconnected();
+        simutidy.highlightUnconnected();
         sl.Text = '高亮完成';
         sl.FontColor = cfg.colors.success;
     catch ME
@@ -307,7 +310,7 @@ function onGeneratePorts(fig)
     cfg = SimuTidy_config();
     sl.Text = '正在生成接口...'; sl.FontColor = cfg.colors.port; drawnow;
     try
-        slGeneratePorts();
+        simutidy.generatePorts();
         sl.Text = '接口生成完成';
         sl.FontColor = cfg.colors.success;
     catch ME
@@ -321,7 +324,7 @@ function onUpdateBlockNames(fig)
     cfg = SimuTidy_config();
     sl.Text = '正在更新模块名称...'; sl.FontColor = cfg.colors.portDark; drawnow;
     try
-        slUpdateBlockNames();
+        simutidy.updateBlockNames();
         sl.Text = '模块名称更新完成';
         sl.FontColor = cfg.colors.success;
     catch ME
@@ -335,7 +338,7 @@ function onSetSignalResolve(fig)
     cfg = SimuTidy_config();
     sl.Text = '正在设置信号对象解析...'; sl.FontColor = cfg.colors.lineDark; drawnow;
     try
-        slSetSignalResolve();
+        simutidy.setSignalResolve();
         sl.Text = '信号对象解析设置完成';
         sl.FontColor = cfg.colors.success;
     catch ME

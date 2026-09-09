@@ -19,7 +19,8 @@ function cfg = SimuTidy_config()
     
     %% GUI配置
     cfg.gui.mainPosition = [500, 120, 460, 620];
-    cfg.gui.alignDialogPos = [520, 380, 320, 340];
+    % 3.1.0 清理：原 cfg.gui.alignDialogPos 已随死代码 SimuTidy_alignDialog
+    % 一并删除（该对话框无任何调用方，主窗口自带对齐按钮组）
     cfg.gui.nameDialogPos = [520, 360, 320, 300];
     cfg.gui.bgColor = [0.961 0.969 0.976];  % 窗口背景 浅灰白 #F5F7F9
     cfg.gui.refreshInterval = 1;  % 模型标签刷新间隔（秒）

@@ -76,7 +76,8 @@ function msg = SimuTidy_check()
     lines{end+1} = '【5】SimuTidy 子目录检查：';
     rootPath = fileparts(which('SimuTidy'));
     if ~isempty(rootPath)
-        subdirs = {'gui', 'core', 'utils'};
+    % 3.1.0 命名空间化：core 已并入 +simutidy 包，检查 gui/utils 两目录
+        subdirs = {'gui', 'utils'};
         for i = 1:length(subdirs)
             d = fullfile(rootPath, subdirs{i});
             if isfolder(d)

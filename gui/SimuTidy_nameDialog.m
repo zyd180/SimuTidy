@@ -59,6 +59,9 @@ end
 function doName(parentFig, dlg, mode) %#ok<INUSL>
     cfg = SimuTidy_config();
     mt = sltidy_iif(strcmp(mode,'source'),'按源模块名',sltidy_iif(strcmp(mode,'source_port'),'按源模块名+端口号',sltidy_iif(strcmp(mode,'outport'),'按输出端口','清除')));
+    % 3.1.0 清理：原三段式 sltidy_iif 嵌套可读性差，保留仅为兼容历史调用；
+    % 实际文案已由 simutidy.autoNameSignals 内部统一生成，此处仅在
+    % 状态栏显示"正在XX命名"用
     % 独立调用（无父窗口）时仅在命令行提示，不更新状态栏
     hasStatus = ~isempty(parentFig) && isvalid(parentFig) && ...
                 isfield(parentFig.UserData, 'statusLabel') && isvalid(parentFig.UserData.statusLabel);
@@ -69,7 +72,8 @@ function doName(parentFig, dlg, mode) %#ok<INUSL>
         drawnow;
     end
     try
-        slAutoNameSignals([], mode);
+        % 3.1.0 命名空间化：GUI 内部调用直调 +simutidy 包实体（理由见主窗口 doAlign 注释）
+        simutidy.autoNameSignals([], mode);
         if hasStatus
             sl.Text = [mt '命名完成'];
             sl.FontColor = cfg.colors.success;

@@ -31,20 +31,24 @@ function SimuTidy()
 %       SimuTidy_config.m             - 配置管理
 %       SimuTidy_install.m            - 安装脚本
 %       SimuTidy_check.m              - 安装检查
+%       +simutidy/                    - 核心功能包（3.1.0 命名空间化，
+%                                       simutidy.alignBlocks 等 10 个实体）
+%       +simutidy/+internal/          - 包内共享工具（sys校验/碰撞/汇总/清洗）
+%       sl*.m                         - slXxx 兼容薄包装（对外契约不变）
 %       gui/SimuTidy_mainGUI.m        - 主GUI界面
-%       gui/SimuTidy_alignDialog.m    - 对齐对话框
 %       gui/SimuTidy_nameDialog.m     - 命名对话框
-%       core/sl*.m               - 核心功能模块
-%       utils/sltidy_*.m         - 工具函数
+%       gui/SimuTidy_onboarding.m     - 新手引导
+%       utils/sltidy_*.m              - 工具函数
 %
 %   作者：Henry
 %   版本日期：2026-09-08
 
     % 确保子目录在路径中
+    % 3.1.0 命名空间化：核心实体在 +simutidy 包内，包随根目录在 path 上
+    % 即可解析，无需单独 addpath；gui/utils 仍需单独加入
     rootPath = fileparts(mfilename('fullpath'));
     if ~isempty(rootPath)
         addpath(fullfile(rootPath, 'gui'));
-        addpath(fullfile(rootPath, 'core'));
         addpath(fullfile(rootPath, 'utils'));
     end
 

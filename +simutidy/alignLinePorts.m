@@ -1,7 +1,7 @@
-function slAlignLinePorts(sys)
-%slAlignLinePorts 连线端口对齐
-%   slAlignLinePorts() - 将当前子系统选中的模块与其连线另一端端口水平对齐
-%   slAlignLinePorts(sys) - 指定子系统
+function alignLinePorts(sys)
+%alignLinePorts 连线端口对齐（3.1.0 自 core/slAlignLinePorts 迁入 +simutidy 包）
+%   simutidy.alignLinePorts() - 将当前子系统选中的模块与其连线另一端端口水平对齐
+%   simutidy.alignLinePorts(sys) - 指定子系统
 %
 %   功能：
 %       - 以选中模块连线的另一端端口为基准（基准端不动）
@@ -12,22 +12,19 @@ function slAlignLinePorts(sys)
 %         再在"全部移动后"的虚拟布局上检查碰撞；会与（移动后的）周围模块
 %         重叠的模块被跳过（不做任何修改），并回落到原位置参与后续检查
 %       - 单个失败不影响其他，最后汇总报告
+%   兼容：根目录 slAlignLinePorts.m 为薄包装，行为契约不变
 
-    if nargin < 1 || isempty(sys)
-        sys = gcs;
-    end
-    if isempty(sys) || ~ishandle(get_param(sys, 'Handle'))
-        error('无效的子系统句柄或路径。');
-    end
+    % 3.1.0 收敛：sys 校验样板统一走 internal.resolveSystem
+    sysPath = simutidy.internal.resolveSystem(sys);
 
-    selBlocks = find_system(sys, 'FindAll', 'on', 'Selected', 'on', 'Type', 'block');
-    selLines = find_system(sys, 'FindAll', 'on', 'Selected', 'on', 'Type', 'line');
+    selBlocks = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'block');
+    selLines = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'line');
     if isempty(selBlocks)
-        error('请先选中要对齐的模块。');
+        error('SimuTidy:noSelection', '请先选中要对齐的模块。');
     end
 
     % 模块位置缓存
-    cacheH = find_system(sys, 'FindAll', 'on', 'SearchDepth', 1, 'Type', 'block');
+    cacheH = find_system(sysPath, 'FindAll', 'on', 'SearchDepth', 1, 'Type', 'block');
     % 3.1.0 性能优化：位置批量读取，1 次 API 调用替代逐块 N 次
     cacheR = cell2mat(get_param(cacheH, 'Position'));
 
@@ -65,7 +62,8 @@ function slAlignLinePorts(sys)
         if ~hasPlan(i)
             continue;
         end
-        if collidesAny(plans(i).newPos, plans(i).blockH, cacheH, virtR)
+        % 3.1.0 收敛：碰撞检查统一走 internal.collidesAny（原两处重复副本）
+        if simutidy.internal.collidesAny(plans(i).newPos, plans(i).blockH, cacheH, virtR)
             skipped(i) = true;
             failInfo{i} = sprintf('  模块%d: 垂直移动会与周围模块重叠（已跳过，未做任何修改）。', i);
             % 裁决失败：该模块回落原位置，后续检查将其视为不动
@@ -94,16 +92,13 @@ function slAlignLinePorts(sys)
     end
     failCount = n - okCount;
 
-    fprintf('连线端口对齐完成：对齐 %d 个模块，跳过 %d 个。\n', okCount, failCount);
-    for i = 1:n
-        if skipped(i) && ~isempty(failInfo{i})
-            fprintf('%s\n', failInfo{i});
-        end
-    end
+    % 3.1.0 收敛：汇总输出统一走 internal.report（原先各函数自行拼接）
+    failInfo = failInfo(cellfun(@(s) ~isempty(s), failInfo));
+    simutidy.internal.report('连线端口对齐', okCount, failCount, failInfo);
 
     % 3.1.0 性能优化：移除 update——本函数只改块 y 坐标并拉直线点，
     % 均为纯几何变化，Simulink 自动重排；编译刷新浪费（理由详见
-    % slAlignBlocks 同名注释）
+    % simutidy/alignBlocks.m 同名注释）
 end
 
 %% ========================================================================
@@ -128,7 +123,7 @@ function plan = makePlan(blockH, selLines)
     end
     lineHs = unique(lineHs);
     if isempty(lineHs)
-        error('没有已连接的连线。');
+        error('SimuTidy:noConnectedLine', '没有已连接的连线。');
     end
 
     % 对齐依据线：优先用户同时选中的线
@@ -143,7 +138,7 @@ function plan = makePlan(blockH, selLines)
     sp = get_param(pickLine, 'SrcPortHandle');
     dp = get_param(pickLine, 'DstPortHandle');
     if isempty(dp) || dp(1) == -1
-        error('对齐依据连线的端口不完整。');
+        error('SimuTidy:incompleteLine', '对齐依据连线的端口不完整。');
     end
     isSrc = false;
     if sp ~= -1 && getSimulinkBlockHandle(get_param(sp, 'Parent')) == blockH
@@ -157,13 +152,13 @@ function plan = makePlan(blockH, selLines)
             end
         end
         if ~found
-            error('对齐依据连线与本模块不相连。');
+            error('SimuTidy:blockNotOnLine', '对齐依据连线与本模块不相连。');
         end
     end
 
     pts = get_param(pickLine, 'Points');
     if size(pts, 1) < 2
-        error('对齐依据连线没有可用的路径点。');
+        error('SimuTidy:noLinePoints', '对齐依据连线没有可用的路径点。');
     end
     if isSrc
         myY = pts(1, 2);
@@ -175,7 +170,7 @@ function plan = makePlan(blockH, selLines)
 
     dy = otherY - myY;
     if abs(dy) < 0.5
-        error('端口已对齐，无需移动。');
+        error('SimuTidy:alreadyAligned', '端口已对齐，无需移动。');
     end
 
     % 只调垂直位置：x 不变，y 平移 dy
@@ -233,14 +228,4 @@ function tf = isBlockSrcOfLine(lh, blockH)
     if sp ~= -1 && getSimulinkBlockHandle(get_param(sp, 'Parent')) == blockH
         tf = true;
     end
-end
-
-%% ========================================================================
-%  碰撞与缓存辅助
-%% ========================================================================
-function tf = collidesAny(rect, selfH, cacheH, cacheR)
-%collidesAny 检查矩形是否与缓存中其他模块重叠
-    tf = any(~ismember(cacheH(:), selfH) & ...
-             ~(cacheR(:, 3) < rect(1) | cacheR(:, 1) > rect(3) | ...
-               cacheR(:, 4) < rect(2) | cacheR(:, 2) > rect(4)));
 end

@@ -1,7 +1,8 @@
-function slUpdateBlockNames(sys)
-%slUpdateBlockNames 更新Inport/Outport模块名称为信号名
-%   slUpdateBlockNames() - 更新当前打开的模型
-%   slUpdateBlockNames(sys) - 更新指定子系统/模型
+function updateBlockNames(sys)
+%updateBlockNames 更新Inport/Outport模块名称为信号名
+%   （3.1.0 自 core/slUpdateBlockNames 迁入 +simutidy 包）
+%   simutidy.updateBlockNames() - 更新当前打开的模型
+%   simutidy.updateBlockNames(sys) - 更新指定子系统/模型
 %
 %   功能：
 %       只处理 Inport/Outport，其余模块不动
@@ -11,28 +12,31 @@ function slUpdateBlockNames(sys)
 %              - Inport：查父层连入该端口的线名；再沿源端递归（子系统内部Outport块名等）
 %              - Outport：沿输入线源端递归（源为子系统时取内部Outport块名）
 %       同层 Inport/Outport 重名时自动追加序号
-%       改名后显示模块名称：ShowName='on' + IconDisplay='Signal name'
+%       改名后显示模块名称：ShowName='on' + IconDisplay='Port number'
 %
-%   注意：
-%       仅修改模块显示名，不影响端口编号和连接关系
+%   已知怪癖（3.1.0 锁定现状，未修）：追溯到的名字与同层**非IO块**同名时，
+%   nameConflict 只检查 Inport/Outport 命名空间视为不冲突 → set_param 实际
+%   抛"名称已被占用" → 被 renameBlock 的 try/catch 吞掉 → 该块静默保持原名。
+%   回归测试 testUpdateBlockNamesTrace 已锁定此行为；未来若修，先改测试
+%   兼容：根目录 slUpdateBlockNames.m 为薄包装，行为契约不变
 
     if nargin < 1 || isempty(sys)
         sys = bdroot;
         if isempty(sys) || strcmp(sys, '')
-            error('没有打开的 Simulink 模型。');
+            error('SimuTidy:noModel', '没有打开的 Simulink 模型。');
         end
     end
 
-    if isempty(sys) || ~ishandle(get_param(sys, 'Handle'))
-        error('无效的子系统句柄或路径。');
-    end
+    % 3.1.0 收敛：校验走 internal.resolveSystem（本函数默认值是 bdroot
+    % 而非 gcs，故默认值在调用前处理，resolveSystem 仅负责校验）
+    sysPath = simutidy.internal.resolveSystem(sys);
 
     % 3.1.0 性能优化：按 BlockType 定向查找，替代原"全块遍历 + 逐块取
     % BlockType 过滤"。普通模型里 IO 块占比极低，旧写法对每个非目标块
     % 都白取一次 BlockType；定向查询直接只返回目标块。
     % 注意保持全层递归语义不变（本功能设计为处理整个模型/子系统树）
-    inports  = find_system(sys, 'FindAll', 'on', 'BlockType', 'Inport');
-    outports = find_system(sys, 'FindAll', 'on', 'BlockType', 'Outport');
+    inports  = find_system(sysPath, 'FindAll', 'on', 'BlockType', 'Inport');
+    outports = find_system(sysPath, 'FindAll', 'on', 'BlockType', 'Outport');
 
     inportCount = 0;
     outportCount = 0;
@@ -133,7 +137,7 @@ end
 %% ========================================================================
 %  工具函数
 %% ========================================================================
-function name = getLineName(blockH, dir)
+function name = getLineName(blockH, dir) %#ok<*> % dir 遮蔽内置函数仅限本子函数作用域，与原实现一致
 %getLineName 获取端口连接线上的信号名
 %   dir: 'out' 取输出端口连线，'in' 取输入端口连线
     name = '';
@@ -157,8 +161,8 @@ function ok = renameBlock(blockH, newName)
 %renameBlock 安全重命名模块，保证同层Inport/Outport名称唯一
     ok = false;
     if isempty(newName), return; end
-    cfg = SimuTidy_config();
-    newName = regexprep(newName, cfg.naming.replaceChars, cfg.naming.replaceWith);
+    % 3.1.0 收敛：名称清洗统一走 internal.sanitizeName
+    newName = simutidy.internal.sanitizeName(newName);
     if isempty(newName), return; end
 
     curName = get_param(blockH, 'Name');
@@ -184,6 +188,7 @@ end
 
 function tf = nameConflict(parentPath, candidate, blockType)
 %nameConflict 判断同层级Inport/Outport是否已使用该名称
+%   注意：只查 Inport/Outport 互斥命名空间（见文件头"已知怪癖"）
     tf = false;
     h = getSimulinkBlockHandle([parentPath '/' candidate]);
     if h ~= -1

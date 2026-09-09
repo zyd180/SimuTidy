@@ -16,10 +16,11 @@
     % ========== 步骤1：添加到永久路径 ==========
     fprintf('[1/5] 添加路径...\n');
     
+    % 3.1.0 命名空间化：核心实体在 +simutidy 包内（随根目录生效），
+    % 不再有 core 子目录；gui/utils 仍需单独加入
     pathsToAdd = {
         rootPath
         fullfile(rootPath, 'gui')
-        fullfile(rootPath, 'core')
         fullfile(rootPath, 'utils')
     };
     
@@ -65,8 +66,8 @@
     fprintf('[3/5] 配置启动项...\n');
     
     startupFile = fullfile(userPath, 'startup.m');
-    startupCmd = sprintf('addpath(''%s'', ''%s'', ''%s'', ''%s''); SimuTidy_version;', ...
-        rootPath, fullfile(rootPath, 'gui'), fullfile(rootPath, 'core'), fullfile(rootPath, 'utils'));
+    startupCmd = sprintf('addpath(''%s'', ''%s'', ''%s''); SimuTidy_version;', ...
+        rootPath, fullfile(rootPath, 'gui'), fullfile(rootPath, 'utils'));
     
     if isfile(startupFile)
         content = fileread(startupFile);
