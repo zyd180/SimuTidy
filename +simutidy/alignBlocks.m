@@ -141,7 +141,8 @@ function alignBlocks(sys, alignType)
         set_param(selectedObjs(i), 'Position', newPosMap(i, :));
     end
 
-    fprintf('%s 完成，基准模块: %s（位置未动），共调整 %d 个模块。\n', ...
+    % 3.3.0：汇总输出接入分级日志（原 fprintf，正文不变加 [INFO] 前缀）
+    simutidy.internal.log('info', '%s 完成，基准模块: %s（位置未动），共调整 %d 个模块。', ...
         getAlignText(alignType), get_param(selectedObjs(baseIdx), 'Name'), n-1);
 
     % 3.1.0 性能优化：移除操作后的 SimulationCommand update。

@@ -195,6 +195,10 @@
     fig.UserData.statusLabel = statusLabel;
     fig.UserData.modelLabel = modelLabel;
 
+    % 3.3.0 统一日志：注册状态栏 sink——核心函数内的 WARN/ERROR 自动上屏
+    %（warn=琥珀色 error=红色）；关窗/切主题时清除（见 onClose/onToggleTheme）
+    simutidy.internal.setLogSink(@(msg, level) guiLogSink(statusLabel, msg, level));
+
     % 定时器刷新模型标签
     t = timer('ExecutionMode', 'fixedRate', 'Period', cfg.gui.refreshInterval, ...
               'TimerFcn', @(~,~) refreshModelLabel(fig));
@@ -372,6 +376,20 @@ function refreshModelLabel(fig)
     end
 end
 
+function guiLogSink(sl, msg, level)
+%guiLogSink 3.3.0 状态栏日志接收器（经 setLogSink 注册）
+%   核心函数内部产生的 warn/error 无需经过 GUI 回调包装也能上状态栏，
+%   状态文本用完整原因，颜色按等级：warn=琥珀、error=红
+    if ~isvalid(sl), return; end
+    cfg = SimuTidy_config();
+    sl.Text = msg;
+    if strcmp(level, 'error')
+        sl.FontColor = cfg.colors.error;
+    else
+        sl.FontColor = cfg.colors.check;
+    end
+end
+
 function onToggleTheme(fig)
 %onToggleTheme 主题切换（3.2.0 新增）
 %   写偏好 → 走定时器清理 → 销毁重建窗口。
@@ -388,6 +406,7 @@ function onToggleTheme(fig)
         try, stop(t); catch, end
         try, delete(t); catch, end
     end
+    simutidy.internal.setLogSink([]);  % 3.3.0：旧窗口的 sink 一并注销
     delete(fig);
     SimuTidy_mainGUI();
 end
@@ -397,5 +416,6 @@ function onClose(fig, t)
         try, stop(t); catch, end
         try, delete(t); catch, end
     end
+    simutidy.internal.setLogSink([]);  % 3.3.0：sink 随窗口注销
     delete(fig);
 end

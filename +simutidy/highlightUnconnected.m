@@ -87,8 +87,10 @@ function highlightUnconnected(sys, clearFlag)
         end
     end
 
-    fprintf('高亮完成，共发现 %d 个有未连接端口的模块。\n', unconnectedCount);
-    fprintf('再次运行将更新高亮状态，运行 simutidy.highlightUnconnected([], true) 可清除高亮。\n');
+    % 3.3.0：汇总输出接入分级日志
+    simutidy.internal.log('info', '高亮完成，共发现 %d 个有未连接端口的模块。', unconnectedCount);
+    simutidy.internal.log('info', ['再次运行将更新高亮状态，运行 ' ...
+        'simutidy.highlightUnconnected([], true) 可清除高亮。']);
 end
 
 %% ========================================================================

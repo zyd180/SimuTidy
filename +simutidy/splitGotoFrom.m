@@ -208,7 +208,8 @@ function [cacheH, cacheR] = splitOneLine(lineH, cfg, cacheH, cacheR)
     add_line(sysPath, srcPortH, ghPort.Inport, 'autorouting', 'on');
     add_line(sysPath, fhPort.Outport, dstPortH, 'autorouting', 'on');
 
-    fprintf('  拆分完成，标签: %s（Goto: %s, From: %s）\n', tagName, ...
+    % 3.3.0：逐线明细接入分级日志（原 fprintf，保留逐线粒度）
+    simutidy.internal.log('info', '  拆分完成，标签: %s（Goto: %s, From: %s）', tagName, ...
         get_param(gh, 'Name'), get_param(fh, 'Name'));
 end
 

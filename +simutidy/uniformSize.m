@@ -62,7 +62,8 @@ function uniformSize(sys, mode)
         set_param(selectedObjs(i), 'Position', newPos);
     end
 
-    fprintf('模块大小统一完成（%s: W=%d, H=%d），共调整 %d 个模块。\n', ...
+    % 3.3.0：汇总输出接入分级日志（原 fprintf）
+    simutidy.internal.log('info', '模块大小统一完成（%s: W=%d, H=%d），共调整 %d 个模块。', ...
         mode, targetW, targetH, n);
 
     % 3.1.0 性能优化：移除 update——纯几何改尺寸后 Simulink 自动重排连线，

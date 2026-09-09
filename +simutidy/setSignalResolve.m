@@ -68,10 +68,11 @@ function setSignalResolve(sys, mode)
         end
     end
 
-    % 保留自定义汇总：本操作有三种计数（新设置/已是目标态/跳过），
-    % 与 internal.report 的"成功/失败"二态模型不匹配，故不强行套用
-    fprintf('信号对象解析设置完成（%s）：新设置 %d 个端口，已是目标态 %d 个，跳过 %d 条（未命名/分支段/无效）。\n', ...
-            mode, setCount, alreadyCount, unnamedCount);
+    % 保留自定义汇总（三种计数与 internal.report 的二态模型不匹配，故不套用）；
+    % 3.3.0 接入分级日志
+    simutidy.internal.log('info', ['信号对象解析设置完成（%s）：新设置 %d 个端口，' ...
+        '已是目标态 %d 个，跳过 %d 条（未命名/分支段/无效）。'], ...
+        mode, setCount, alreadyCount, unnamedCount);
 
     % 本操作保留 update：勾选 MustResolveToSignalObject 后，update 编译
     % 才会触发"信号名必须能解析到工作区对象"的校验——这是该功能的验收

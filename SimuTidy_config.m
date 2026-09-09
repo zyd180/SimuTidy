@@ -1,6 +1,10 @@
 function cfg = SimuTidy_config()
 %SimuTidy_config SimuTidy工具配置文件
 %   所有可调参数集中管理，修改此文件即可全局生效
+%   3.3.0：新增用户级覆盖（userpath/SimuTidy_config_user.json），
+%   坏文件一次性告警（persistent 防刷屏，见文件末尾）
+
+    persistent warnedBad   % 用户配置解析失败的"只告警一次"标志（函数顶部声明）
 
     %% 版本信息
     cfg.version = '3.2.0';
@@ -81,6 +85,47 @@ function cfg = SimuTidy_config()
     cfg.colors = cfg.themes.(cfg.themeName);
     % 兼容字段：gui 代码原样读 cfg.gui.bgColor（字段路径保持 2.6.1 写法）
     cfg.gui.bgColor = cfg.colors.bgColor;
+
+    %% 日志配置（3.3.0 统一日志系统）
+    cfg.log.level = 'info';   % debug/info/warn/error
+
+    %% 用户级配置覆盖（3.3.0，必须放在所有默认值之后：代码默认 < 用户 JSON）
+    % 文件：userpath/SimuTidy_config_user.json；白名单/类型校验与写入端
+    % 共用 +internal/userConfig 的同一张表。
+    % 防刷屏设计：config() 被每次功能调用/日志输出触发，坏文件只告警一次；
+    % 非白名单键/类型不符静默跳过（手编文件的兜底，不值得每次刷警告）
+    uf = simutidy.internal.userConfig('path');
+    if isfile(uf)
+        if isempty(warnedBad), warnedBad = false; end
+        try
+            data = jsondecode(fileread(uf));
+            if isstruct(data)
+                wl = simutidy.internal.userConfig('list');
+                % 嵌套格式：{"goto":{"gap":77}} → 遍历 组/字段 两级，
+                % 每项过白名单+类型校验（与写入端同一张表，口径不分叉）
+                groups = fieldnames(data);
+                for gi = 1:numel(groups)
+                    g = groups{gi};
+                    if ~isfield(cfg, g) || ~isstruct(data.(g)), continue; end
+                    fk = fieldnames(data.(g));
+                    for fi = 1:numel(fk)
+                        key = [g '.' fk{fi}];
+                        hit = find(strcmp(wl(:, 1), key), 1);
+                        if isempty(hit), continue; end
+                        v = data.(g).(fk{fi});
+                        if ~isa(v, wl{hit, 2}), continue; end
+                        cfg.(g).(fk{fi}) = v;
+                    end
+                end
+            end
+        catch ME
+            if ~warnedBad
+                warnedBad = true;
+                warning('SimuTidy:badUserConfig', ...
+                    '用户配置文件解析失败，已忽略（%s）', ME.message);
+            end
+        end
+    end
     
     %% Simulink API配置
     % 3.1.0 语义变更：此开关只对"需要编译校验"的操作生效（信号对象解析、

@@ -32,6 +32,7 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
 
     properties
         ModelName = ''
+        sinkMsgs = {}   % 3.3.0 日志 sink 捕获（TestCase 是 handle 类，闭包可写回）
     end
 
     methods (TestMethodSetup)
@@ -69,6 +70,19 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
             for h = lh(:)'
                 set_param(h, 'Selected', 'on');
             end
+        end
+
+        function restoreUserConfig(tc, up, backup, hadBefore) %#ok<INUSL>
+            % 3.3.0 测试辅助：还原真实 userpath 下的用户配置文件
+            if hadBefore && isfile(backup)
+                movefile(backup, up);
+            else
+                if isfile(up), delete(up); end
+            end
+        end
+
+        function captureSink(tc, msg, lv)
+            tc.sinkMsgs{end+1} = sprintf('%s|%s', lv, msg); %#ok<AGROW>
         end
 
         function assertThrows(tc, fcn)
@@ -434,6 +448,61 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
             sA = [pA2(3) - pA2(1), pA2(4) - pA2(2)];
             sB = [pB2(3) - pB2(1), pB2(4) - pB2(2)];
             tc.verifyEqual(sA, sB, '零参大小统一未生效');
+        end
+    end
+
+    %% ====================================================================
+    %  11. 用户级配置 / 统一日志（3.3.0）
+    %% ====================================================================
+    methods (Test)
+        function testUserConfigOverride(tc)
+            % 白名单覆盖生效 + 非白名单键跳过 + 坏文件回落默认。
+            % 说明：写入的是真实 userpath 文件（测试后还原/删除）——
+            % 该文件本来就是"用户机器级"，无沙箱替代方案。
+            % JSON 用嵌套对象：jsondecode 会把平铺点键名（"goto.gap"）
+            % 改写为合法标识符，平铺方案无法往返（3.3.0 踩坑定稿）
+            up = simutidy.internal.userConfig('path');
+            hadBefore = isfile(up);
+            backup = [up '.tstbak'];
+            if hadBefore, copyfile(up, backup); end
+            onCleanup(@() tc.restoreUserConfig(up, backup, hadBefore));
+
+            json = ['{' newline ...
+                '  "goto": {"gap": 77, "gapBad": "x"},' newline ...
+                '  "log": {"level": "debug"},' newline ...
+                '  "gui": {"showOnboarding": false},' newline ...
+                '  "unknown": {"key": 1}' newline ...
+                '}'];
+            fid = fopen(up, 'w'); fwrite(fid, json); fclose(fid);
+
+            cfg = SimuTidy_config();
+            tc.verifyEqual(cfg.goto.gap, 77, '白名单覆盖未生效');
+            tc.verifyEqual(cfg.log.level, 'debug', '日志等级覆盖未生效');
+            tc.verifyEqual(cfg.gui.showOnboarding, false, '逻辑覆盖未生效');
+            tc.verifyEqual(cfg.goto.tagVisibility, 'local', ...
+                '非白名单字段不应影响默认值');
+
+            % 坏 JSON：不抛错、回落默认
+            fid = fopen(up, 'w'); fwrite(fid, '{bad json'); fclose(fid);
+            cfg2 = SimuTidy_config();
+            tc.verifyEqual(cfg2.goto.gap, 40, '坏文件应回落默认值');
+        end
+
+        function testLogSink(tc)
+            % sink 只收 warn/error；info 不转发；清除后停止转发
+            tc.sinkMsgs = {};
+            simutidy.internal.setLogSink(@(msg, lv) tc.captureSink(msg, lv));
+            cleaner = onCleanup(@() simutidy.internal.setLogSink([]));
+
+            simutidy.internal.log('warn', 'tw%d', 1);
+            simutidy.internal.log('info', 'no-capture');
+            simutidy.internal.log('error', 'tw%d', 2);
+            tc.verifyEqual(numel(tc.sinkMsgs), 2, 'sink 应只收 warn/error');
+            tc.verifyEqual(tc.sinkMsgs{1}, 'warn|tw1', '等级/内容不符');
+
+            simutidy.internal.setLogSink([]);
+            simutidy.internal.log('warn', 'after-clear');
+            tc.verifyEqual(numel(tc.sinkMsgs), 2, '清除后不应再转发');
         end
     end
 end

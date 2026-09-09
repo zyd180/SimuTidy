@@ -88,8 +88,8 @@ function autoNameSignals(sys, mode)
         end
     end
 
-    fprintf('%s 完成，共处理 %d 条信号线。\n', ...
-        modeLabel(mode), namedCount);
+    % 3.3.0：汇总输出接入分级日志（原 fprintf）
+    simutidy.internal.log('info', '%s 完成，共处理 %d 条信号线。', modeLabel(mode), namedCount);
 end
 
 function txt = modeLabel(mode)

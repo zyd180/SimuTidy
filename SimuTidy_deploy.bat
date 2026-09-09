@@ -12,10 +12,11 @@ if errorlevel 1 (
 )
 
 echo [SimuTidy deploy] Source: %SimuTidy_DIR%
-echo [SimuTidy deploy] Launching MATLAB to run SimuTidy_install (R2019a+, ~30-60s)...
+echo [SimuTidy deploy] Running regression tests, then install (3.3.0 gate)...
 echo.
 
-matlab -batch "addpath('%SimuTidy_DIR%'); addpath(fullfile('%SimuTidy_DIR%','gui')); addpath(fullfile('%SimuTidy_DIR%','core')); addpath(fullfile('%SimuTidy_DIR%','utils')); SimuTidy_install"
+rem 3.3.0 门禁：先跑回归测试，任何用例失败即 exit 1 中止安装
+matlab -batch "addpath('%SimuTidy_DIR%'); addpath(fullfile('%SimuTidy_DIR%','gui')); addpath(fullfile('%SimuTidy_DIR%','utils')); r = runtests(fullfile('%SimuTidy_DIR%','tests')); if any(~[r.Passed]), disp('=== TESTS FAILED, INSTALL ABORTED ==='); exit(1); end; SimuTidy_install"
 
 if errorlevel 1 (
     echo.

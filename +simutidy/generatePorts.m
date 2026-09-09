@@ -133,5 +133,7 @@ function generatePorts(sys)
     catch
     end
 
-    fprintf('接口生成完成：添加 %d 个Inport，%d 个Outport\n', addedInports, addedOutports);
+    % 3.3.0：汇总输出接入分级日志
+    simutidy.internal.log('info', '接口生成完成：添加 %d 个Inport，%d 个Outport', ...
+        addedInports, addedOutports);
 end

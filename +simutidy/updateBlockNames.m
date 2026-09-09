@@ -54,7 +54,8 @@ function updateBlockNames(sys)
         end
     end
 
-    fprintf('模块名称更新完成：Inport %d 个，Outport %d 个。\n', ...
+    % 3.3.0：汇总输出接入分级日志
+    simutidy.internal.log('info', '模块名称更新完成：Inport %d 个，Outport %d 个。', ...
         inportCount, outportCount);
 end
 
