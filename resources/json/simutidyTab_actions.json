@@ -1,0 +1,221 @@
+{
+    "version": "1.0",
+    "entries": [
+        {
+            "type": "Action",
+            "id": "openTidyAction",
+            "text": "打开 SimuTidy\n窗口",
+            "description": "打开 SimuTidy 主工具窗口",
+            "icon": {
+                "icon16": "openTidy_16.png",
+                "icon24": "openTidy_24.png"
+            },
+            "command": "SimuTidy",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "alignPopupAction",
+            "text": "模块\n对齐",
+            "description": "选择模块对齐与等间距分布方式（基准模块不动）",
+            "icon": {
+                "icon16": "align_16.png",
+                "icon24": "align_24.png"
+            },
+            "command": "slAlignBlocks([], 'left')",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "alignLeftAction",
+            "text": "左对齐",
+            "description": "所有选中模块左边缘对齐到基准模块",
+            "icon": {
+                "icon16": "align_l_16.png",
+                "icon24": "align_l_24.png"
+            },
+            "command": "slAlignBlocks([], 'left')",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "alignRightAction",
+            "text": "右对齐",
+            "description": "所有选中模块右边缘对齐到基准模块",
+            "icon": {
+                "icon16": "align_r_16.png",
+                "icon24": "align_r_24.png"
+            },
+            "command": "slAlignBlocks([], 'right')",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "alignTopAction",
+            "text": "顶部对齐",
+            "description": "所有选中模块顶边对齐到基准模块",
+            "icon": {
+                "icon16": "align_t_16.png",
+                "icon24": "align_t_24.png"
+            },
+            "command": "slAlignBlocks([], 'top')",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "alignBottomAction",
+            "text": "底部对齐",
+            "description": "所有选中模块底边对齐到基准模块",
+            "icon": {
+                "icon16": "align_b_16.png",
+                "icon24": "align_b_24.png"
+            },
+            "command": "slAlignBlocks([], 'bottom')",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "alignHCenterAction",
+            "text": "水平居中",
+            "description": "所有选中模块水平中心线对齐到基准模块",
+            "icon": {
+                "icon16": "align_hc_16.png",
+                "icon24": "align_hc_24.png"
+            },
+            "command": "slAlignBlocks([], 'hcenter')",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "alignVCenterAction",
+            "text": "垂直居中",
+            "description": "所有选中模块垂直中心线对齐到基准模块",
+            "icon": {
+                "icon16": "align_vc_16.png",
+                "icon24": "align_vc_24.png"
+            },
+            "command": "slAlignBlocks([], 'vcenter')",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "alignHSpaceAction",
+            "text": "水平等间距",
+            "description": "按水平中心将选中模块等间距分布",
+            "icon": {
+                "icon16": "align_hs_16.png",
+                "icon24": "align_hs_24.png"
+            },
+            "command": "slAlignBlocks([], 'hspace')",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "alignVSpaceAction",
+            "text": "垂直等间距",
+            "description": "按垂直中心将选中模块等间距分布",
+            "icon": {
+                "icon16": "align_vs_16.png",
+                "icon24": "align_vs_24.png"
+            },
+            "command": "slAlignBlocks([], 'vspace')",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "sizeAction",
+            "text": "大小统一",
+            "description": "以基准模块为准统一选中模块大小，保持中心点不变",
+            "icon": {
+                "icon16": "size_16.png",
+                "icon24": "size_24.png"
+            },
+            "command": "slUniformSize()",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "alignPortAction",
+            "text": "连线\n端口对齐",
+            "description": "以连线另一端端口为基准，垂直移动选中模块使端口同高，连线变水平直线",
+            "icon": {
+                "icon16": "portalign_16.png",
+                "icon24": "portalign_24.png"
+            },
+            "command": "slAlignLinePorts()",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "nameAction",
+            "text": "信号线\n命名",
+            "description": "打开信号线命名对话框（按源模块名/端口号/输出端口命名）",
+            "icon": {
+                "icon16": "name_16.png",
+                "icon24": "name_24.png"
+            },
+            "command": "SimuTidy_nameDialog()",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "splitAction",
+            "text": "拆分\nGoto/From",
+            "description": "将选中的长连线批量拆分为Goto/From对（支持多选）",
+            "icon": {
+                "icon16": "split_16.png",
+                "icon24": "split_24.png"
+            },
+            "command": "slSplitGotoFrom()",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "resolveAction",
+            "text": "信号对象\n解析",
+            "description": "为当前层级所有有名字的信号线勾选信号名称必须解析为Simulink对象（更新图时强制校验）",
+            "icon": {
+                "icon16": "resolve_16.png",
+                "icon24": "resolve_24.png"
+            },
+            "command": "slSetSignalResolve()",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "genPortAction",
+            "text": "生成接口",
+            "description": "为选中的Subsystem未连接端口自动添加Inport/Outport并连线",
+            "icon": {
+                "icon16": "genport_16.png",
+                "icon24": "genport_24.png"
+            },
+            "command": "slGeneratePorts()",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "updNameAction",
+            "text": "更新\n模块名称",
+            "description": "将Inport/Outport模块名更新为信号线名",
+            "icon": {
+                "icon16": "updname_16.png",
+                "icon24": "updname_24.png"
+            },
+            "command": "slUpdateBlockNames()",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "highlightAction",
+            "text": "高亮\n未连接",
+            "description": "高亮有未连接端口的模块及悬空信号线",
+            "icon": {
+                "icon16": "highlight_16.png",
+                "icon24": "highlight_24.png"
+            },
+            "command": "slHighlightUnconnected()",
+            "commandType": "Script"
+        }
+    ]
+}

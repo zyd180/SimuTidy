@@ -1,0 +1,15 @@
+% MATLAB 临时/生成物
+*.asv
+*.m~
+*.autosave
+*.slxc
+*.mdb
+*.bak.*
+*.orig
+
+% Simulink 缓存与临时模型
+slprj/
+*.slx.bak
+
+% 测试输出
+tests/output/

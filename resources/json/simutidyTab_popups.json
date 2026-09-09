@@ -1,0 +1,51 @@
+{
+    "version": "1.0",
+    "entries": [
+        {
+            "type": "PopupList",
+            "id": "alignPopUpList",
+            "children": [
+                {
+                    "type": "ListHeader",
+                    "text": "对齐方式"
+                },
+                {
+                    "type": "ListItem",
+                    "action": "alignLeftAction"
+                },
+                {
+                    "type": "ListItem",
+                    "action": "alignRightAction"
+                },
+                {
+                    "type": "ListItem",
+                    "action": "alignTopAction"
+                },
+                {
+                    "type": "ListItem",
+                    "action": "alignBottomAction"
+                },
+                {
+                    "type": "ListItem",
+                    "action": "alignHCenterAction"
+                },
+                {
+                    "type": "ListItem",
+                    "action": "alignVCenterAction"
+                },
+                {
+                    "type": "ListHeader",
+                    "text": "等间距分布"
+                },
+                {
+                    "type": "ListItem",
+                    "action": "alignHSpaceAction"
+                },
+                {
+                    "type": "ListItem",
+                    "action": "alignVSpaceAction"
+                }
+            ]
+        }
+    ]
+}
