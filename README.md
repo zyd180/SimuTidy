@@ -188,6 +188,10 @@ cfg = SimuTidy_config();
 % 也可命令行切换后重开主窗口
 setpref('SimuTidy', 'theme', 'dark')   % 'light'（默认）/ 'dark'
 
+% 用户级配置（3.3.0）：userpath/SimuTidy_config_user.json 可覆盖默认值
+% （嵌套 JSON，如 {"goto": {"gap": 77}}），白名单校验，坏文件自动回落；
+% 主窗口右下"设置"按钮可图形化编辑常用项
+
 % Goto/From 模块配置
 cfg.goto.defaultWidth = 60;    % 默认宽度
 cfg.goto.defaultHeight = 30;   % 默认高度
