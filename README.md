@@ -149,27 +149,33 @@ SimuTidy/
 ├── SimuTidy_config.m             # 配置文件
 ├── SimuTidy_install.m            # 安装脚本
 ├── SimuTidy_check.m              # 安装检查
-├── gui/                     # GUI 模块
+├── +simutidy/                    # 核心功能包（3.1.0 命名空间化）
+│   ├── alignBlocks.m … exportWebView.m   # 10 个功能实体
+│   └── +internal/                # 包内共享工具
+│       ├── resolveSystem.m       #   sys 参数归一化+校验
+│       ├── collidesAny.m         #   AABB 碰撞检查
+│       ├── report.m              #   批量操作统一汇总输出
+│       ├── sanitizeName.m        #   名称非法字符清洗
+│       └── capabilities.m        #   版本/许可证特性检测
+├── sl*.m                         # slXxx 兼容薄包装（对外契约不变）
+├── gui/                          # GUI 模块
 │   ├── SimuTidy_mainGUI.m        # 主界面
-│   ├── SimuTidy_alignDialog.m    # 对齐对话框
-│   └── SimuTidy_nameDialog.m     # 命名对话框
-├── core/                    # 核心功能
-│   ├── slExportWebView.m
-│   ├── slAlignLinePorts.m
-│   ├── slAlignBlocks.m
-│   ├── slUniformSize.m
-│   ├── slAutoNameSignals.m
-│   ├── slSplitGotoFrom.m
-│   ├── slSetSignalResolve.m
-│   ├── slHighlightUnconnected.m
-│   ├── slGeneratePorts.m
-│   └── slUpdateBlockNames.m
-├── utils/                   # 工具函数
+│   ├── SimuTidy_nameDialog.m     # 命名对话框
+│   └── SimuTidy_onboarding.m     # 新手引导
+├── resources/                    # Toolstrip 定义 + 图标 + 菜单模板
+│   ├── json/                     #   选项卡 JSON
+│   ├── icons/                    #   16/24 双尺寸 PNG
+│   └── templates/                #   sl_customization.m 模板
+├── utils/                        # 工具函数
 │   ├── sltidy_iif.m
 │   └── sltidy_getModelName.m
-├── README.md                # 本文件
-└── CHANGELOG.md             # 更新日志
+├── tests/                        # 回归测试与性能基准
+├── README.md                     # 本文件
+└── CHANGELOG.md                  # 更新日志
 ```
+
+> 兼容性说明（3.1.0）：所有 `slXxx` 命令行入口签名与行为不变，既有脚本
+> 无需修改；GUI 与安装菜单内部已直调 `simutidy.*` 包函数。
 
 ## 配置
 

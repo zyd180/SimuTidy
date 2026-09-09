@@ -8,9 +8,9 @@ function zipFile = exportWebView(modelName, outputFolder)
 %   需要：Simulink Report Generator 许可证
 %   兼容：根目录 slExportWebView.m 为薄包装，行为契约不变
 
-    % 3.1.0 收敛：许可证检测保留在此处（调用频率低，且本函数是许可证
-    % 的唯一消费点；capabilities.m 的引入见 Phase 3，若引入则替换此处）
-    if ~license('test', 'Simulink_Report_Gen')
+    % 3.1.0 收敛：许可证检测统一走 internal.capabilities（原散落各处）
+    cap = simutidy.internal.capabilities();
+    if ~cap.hasReportGen
         error('SimuTidy:noLicense', '需要 Simulink Report Generator 许可证。');
     end
 

@@ -1,6 +1,6 @@
 function SimuTidy()
 %SimuTidy Simulink 建模辅助小工具 - 入口函数
-%   版本：3.0.0
+%   版本：3.1.0（架构重构：+simutidy 命名空间、性能优化、兼容层）
 %
 %   功能：
 %       1. 导出当前模型为 HTML Web 视图（仅生成 zip，不解压不打开）

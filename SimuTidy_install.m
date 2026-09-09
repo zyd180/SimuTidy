@@ -58,8 +58,21 @@
         fprintf('      已备份原文件\n');
     end
     
-    % 直接写入文件，避免字符串拼接过长
-    writeCustomizationFile(custFile, cfg);
+    % 3.1.0 兼容层：菜单定义改为模板文件维护。原实现用 ~170 行 fprintf
+    % 拼接生成 sl_customization.m——不可 diff、难维护、菜单改动要改
+    % 安装脚本本身。现在唯一数据源是 resources/templates/ 下的模板，
+    % 占位符仅 @VERSION@；改菜单只改模板，安装脚本零改动
+    tmpl = fullfile(rootPath, 'resources', 'templates', 'sl_customization.m.tmpl');
+    if ~isfile(tmpl)
+        error('SimuTidy:templateMissing', '菜单模板缺失: %s', tmpl);
+    end
+    content = fileread(tmpl);
+    fid = fopen(custFile, 'w');
+    if fid == -1
+        error('SimuTidy:writeFailed', '无法创建文件: %s', custFile);
+    end
+    fwrite(fid, strrep(content, '@VERSION@', cfg.version));
+    fclose(fid);
     fprintf('      已创建: %s\n', custFile);
 
     % ========== 步骤3：添加到 startup.m ==========
@@ -104,7 +117,10 @@
 
     % ========== 步骤5：注册 Simulink Toolstrip 选项卡 ==========
     fprintf('[5/5] 注册 Toolstrip 选项卡...\n');
-    if exist('slReloadToolstripConfig', 'file')
+    % 3.1.0 兼容层：特性检测统一走 simutidy.internal.capabilities
+    % （原 exist('slReloadToolstripConfig','file') 就地判断，无法复用）
+    cap = simutidy.internal.capabilities();
+    if cap.hasToolstrip
         try
             slReloadToolstripConfig;
             fprintf('      已注册（打开模型后在 格式 与 APP 之间可见 SimuTidy 选项卡）\n');
@@ -123,171 +139,4 @@
     fprintf('    打开 Simulink -> Tools -> SimuTidy\n\n');
     fprintf('  版本: %s\n', cfg.version);
     fprintf('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-end
-
-%% ========================================================================
-%  直接写入 sl_customization.m 文件
-%% ========================================================================
-function writeCustomizationFile(custFile, cfg)
-    fid = fopen(custFile, 'w');
-    if fid == -1
-        error('无法创建文件: %s', custFile);
-    end
-    
-    % 写入头部
-    fprintf(fid, 'function sl_customization(cm)\n');
-    fprintf(fid, '%% sl_customization - SimuTidy Simulink 菜单集成\n');
-    fprintf(fid, '%% 版本: %s\n\n', cfg.version);
-    fprintf(fid, '    cm.addCustomMenuFcn(''Simulink:ToolsMenu'', @getSimuTidyItems);\n');
-    fprintf(fid, 'end\n\n');
-    
-    % 菜单列表
-    fprintf(fid, 'function schemas = getSimuTidyItems(~)\n');
-    fprintf(fid, '    schemas = {\n');
-    fprintf(fid, '        @getOpenGUI\n');
-    fprintf(fid, '        @getExportItem\n');
-    fprintf(fid, '        @getStraightenItem\n');
-    fprintf(fid, '        @getAlignItem\n');
-    fprintf(fid, '        @getSizeItem\n');
-    fprintf(fid, '        @getNameItem\n');
-    fprintf(fid, '        @getSplitItem\n');
-    fprintf(fid, '        @getHighlightItem\n');
-    fprintf(fid, '        @getGeneratePortsItem\n');
-    fprintf(fid, '        @getUpdateBlockNamesItem\n');
-    fprintf(fid, '    };\n');
-    fprintf(fid, 'end\n\n');
-    
-    % 打开GUI
-    fprintf(fid, 'function schema = getOpenGUI(~)\n');
-    fprintf(fid, '    schema = sl_action_schema;\n');
-    fprintf(fid, '    schema.tag = ''SimuTidyOpenGUI'';\n');
-    fprintf(fid, '    schema.label = ''SimuTidy 打开工具窗口'';\n');
-    fprintf(fid, '    schema.callback = @(~) SimuTidy();\n');
-    fprintf(fid, 'end\n\n');
-    
-    % 导出Web视图
-    fprintf(fid, 'function schema = getExportItem(~)\n');
-    fprintf(fid, '    schema = sl_action_schema;\n');
-    fprintf(fid, '    schema.tag = ''SimuTidyExport'';\n');
-    fprintf(fid, '    schema.label = ''导出 Web 视图 (ZIP)'';\n');
-    fprintf(fid, '    schema.callback = @(~) slExportWebView();\n');
-    fprintf(fid, 'end\n\n');
-    
-    % 连线端口对齐
-    fprintf(fid, 'function schema = getStraightenItem(~)\n');
-    fprintf(fid, '    schema = sl_action_schema;\n');
-    fprintf(fid, '    schema.tag = ''SimuTidyAlignLinePorts'';\n');
-    fprintf(fid, '    schema.label = ''连线端口对齐'';\n');
-    fprintf(fid, '    schema.callback = @(~) slAlignLinePorts();\n');
-    fprintf(fid, 'end\n\n');
-    
-    % 模块对齐
-    fprintf(fid, 'function schema = getAlignItem(~)\n');
-    fprintf(fid, '    schema = sl_container_schema;\n');
-    fprintf(fid, '    schema.tag = ''SimuTidyAlign'';\n');
-    fprintf(fid, '    schema.label = ''模块对齐'';\n');
-    fprintf(fid, '    schema.childrenFcns = {\n');
-    fprintf(fid, '        @getAlignLeft\n');
-    fprintf(fid, '        @getAlignRight\n');
-    fprintf(fid, '        @getAlignTop\n');
-    fprintf(fid, '        @getAlignBottom\n');
-    fprintf(fid, '        @getAlignHCenter\n');
-    fprintf(fid, '        @getAlignVCenter\n');
-    fprintf(fid, '        @getAlignHSpace\n');
-    fprintf(fid, '        @getAlignVSpace\n');
-    fprintf(fid, '    };\n');
-    fprintf(fid, 'end\n\n');
-    
-    % 对齐子项
-    alignItems = {'Left', 'left', '左对齐'; ...
-                  'Right', 'right', '右对齐'; ...
-                  'Top', 'top', '顶部对齐'; ...
-                  'Bottom', 'bottom', '底部对齐'; ...
-                  'HCenter', 'hcenter', '水平居中'; ...
-                  'VCenter', 'vcenter', '垂直居中'; ...
-                  'HSpace', 'hspace', '水平等间距'; ...
-                  'VSpace', 'vspace', '垂直等间距'};
-    
-    for i = 1:size(alignItems, 1)
-        name = alignItems{i, 1};
-        type = alignItems{i, 2};
-        label = alignItems{i, 3};
-        fprintf(fid, 'function schema = getAlign%s(~)\n', name);
-        fprintf(fid, '    schema = sl_action_schema;\n');
-        fprintf(fid, '    schema.label = ''%s'';\n', label);
-        fprintf(fid, '    schema.callback = @(~) slAlignBlocks([], ''%s'');\n', type);
-        fprintf(fid, 'end\n\n');
-    end
-    
-    % 大小统一
-    fprintf(fid, 'function schema = getSizeItem(~)\n');
-    fprintf(fid, '    schema = sl_action_schema;\n');
-    fprintf(fid, '    schema.tag = ''SimuTidySize'';\n');
-    fprintf(fid, '    schema.label = ''模块大小统一'';\n');
-    fprintf(fid, '    schema.callback = @(~) slUniformSize();\n');
-    fprintf(fid, 'end\n\n');
-    
-    % 信号线命名
-    fprintf(fid, 'function schema = getNameItem(~)\n');
-    fprintf(fid, '    schema = sl_container_schema;\n');
-    fprintf(fid, '    schema.tag = ''SimuTidyName'';\n');
-    fprintf(fid, '    schema.label = ''信号线命名'';\n');
-    fprintf(fid, '    schema.childrenFcns = {\n');
-    fprintf(fid, '        @getNameBySource\n');
-    fprintf(fid, '        @getNameBySourcePort\n');
-    fprintf(fid, '        @getNameByOutport\n');
-    fprintf(fid, '        @getNameClear\n');
-    fprintf(fid, '    };\n');
-    fprintf(fid, 'end\n\n');
-    
-    % 命名子项
-    nameItems = {'BySource', 'source', '按源模块名命名'; ...
-                 'BySourcePort', 'source_port', '按源模块名+端口号命名'; ...
-                 'ByOutport', 'outport', '按输出端口命名'; ...
-                 'Clear', 'clear', '清除所有命名'};
-    
-    for i = 1:size(nameItems, 1)
-        name = nameItems{i, 1};
-        mode = nameItems{i, 2};
-        label = nameItems{i, 3};
-        fprintf(fid, 'function schema = getName%s(~)\n', name);
-        fprintf(fid, '    schema = sl_action_schema;\n');
-        fprintf(fid, '    schema.label = ''%s'';\n', label);
-        fprintf(fid, '    schema.callback = @(~) slAutoNameSignals([], ''%s'');\n', mode);
-        fprintf(fid, 'end\n\n');
-    end
-    
-    % Goto/From拆分
-    fprintf(fid, 'function schema = getSplitItem(~)\n');
-    fprintf(fid, '    schema = sl_action_schema;\n');
-    fprintf(fid, '    schema.tag = ''SimuTidySplit'';\n');
-    fprintf(fid, '    schema.label = ''长连线拆 Goto/From'';\n');
-    fprintf(fid, '    schema.callback = @(~) slSplitGotoFrom();\n');
-    fprintf(fid, 'end\n\n');
-    
-    % 高亮未连接端口
-    fprintf(fid, 'function schema = getHighlightItem(~)\n');
-    fprintf(fid, '    schema = sl_action_schema;\n');
-    fprintf(fid, '    schema.tag = ''SimuTidyHighlight'';\n');
-    fprintf(fid, '    schema.label = ''高亮未连接端口'';\n');
-    fprintf(fid, '    schema.callback = @(~) slHighlightUnconnected();\n');
-    fprintf(fid, 'end\n\n');
-    
-    % 生成接口
-    fprintf(fid, 'function schema = getGeneratePortsItem(~)\n');
-    fprintf(fid, '    schema = sl_action_schema;\n');
-    fprintf(fid, '    schema.tag = ''SimuTidyGeneratePorts'';\n');
-    fprintf(fid, '    schema.label = ''生成接口'';\n');
-    fprintf(fid, '    schema.callback = @(~) slGeneratePorts();\n');
-    fprintf(fid, 'end\n');
-
-    % 更新模块名称
-    fprintf(fid, 'function schema = getUpdateBlockNamesItem(~)\n');
-    fprintf(fid, '    schema = sl_action_schema;\n');
-    fprintf(fid, '    schema.tag = ''SimuTidyUpdateBlockNames'';\n');
-    fprintf(fid, '    schema.label = ''更新模块名称'';\n');
-    fprintf(fid, '    schema.callback = @(~) slUpdateBlockNames();\n');
-    fprintf(fid, 'end\n');
-    
-    fclose(fid);
 end

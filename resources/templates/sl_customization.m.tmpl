@@ -1,0 +1,179 @@
+function sl_customization(cm)
+% sl_customization - SimuTidy Simulink 菜单集成
+% 版本: @VERSION@
+% 本文件由 SimuTidy_install 从 resources/templates/ 本模板生成；
+% 修改菜单请改模板，不要直接改用户目录下的生成物（重装会被覆盖）。
+
+    cm.addCustomMenuFcn('Simulink:ToolsMenu', @getSimuTidyItems);
+end
+
+function schemas = getSimuTidyItems(~)
+    schemas = {
+        @getOpenGUI
+        @getExportItem
+        @getStraightenItem
+        @getAlignItem
+        @getSizeItem
+        @getNameItem
+        @getSplitItem
+        @getHighlightItem
+        @getGeneratePortsItem
+        @getUpdateBlockNamesItem
+    };
+end
+
+function schema = getOpenGUI(~)
+    schema = sl_action_schema;
+    schema.tag = 'SimuTidyOpenGUI';
+    schema.label = 'SimuTidy 打开工具窗口';
+    schema.callback = @(~) SimuTidy();
+end
+
+function schema = getExportItem(~)
+    schema = sl_action_schema;
+    schema.tag = 'SimuTidyExport';
+    schema.label = '导出 Web 视图 (ZIP)';
+    schema.callback = @(~) slExportWebView();
+end
+
+function schema = getStraightenItem(~)
+    schema = sl_action_schema;
+    schema.tag = 'SimuTidyAlignLinePorts';
+    schema.label = '连线端口对齐';
+    schema.callback = @(~) slAlignLinePorts();
+end
+
+function schema = getAlignItem(~)
+    schema = sl_container_schema;
+    schema.tag = 'SimuTidyAlign';
+    schema.label = '模块对齐';
+    schema.childrenFcns = {
+        @getAlignLeft
+        @getAlignRight
+        @getAlignTop
+        @getAlignBottom
+        @getAlignHCenter
+        @getAlignVCenter
+        @getAlignHSpace
+        @getAlignVSpace
+    };
+end
+
+function schema = getAlignLeft(~)
+    schema = sl_action_schema;
+    schema.label = '左对齐';
+    schema.callback = @(~) slAlignBlocks([], 'left');
+end
+
+function schema = getAlignRight(~)
+    schema = sl_action_schema;
+    schema.label = '右对齐';
+    schema.callback = @(~) slAlignBlocks([], 'right');
+end
+
+function schema = getAlignTop(~)
+    schema = sl_action_schema;
+    schema.label = '顶部对齐';
+    schema.callback = @(~) slAlignBlocks([], 'top');
+end
+
+function schema = getAlignBottom(~)
+    schema = sl_action_schema;
+    schema.label = '底部对齐';
+    schema.callback = @(~) slAlignBlocks([], 'bottom');
+end
+
+function schema = getAlignHCenter(~)
+    schema = sl_action_schema;
+    schema.label = '水平居中';
+    schema.callback = @(~) slAlignBlocks([], 'hcenter');
+end
+
+function schema = getAlignVCenter(~)
+    schema = sl_action_schema;
+    schema.label = '垂直居中';
+    schema.callback = @(~) slAlignBlocks([], 'vcenter');
+end
+
+function schema = getAlignHSpace(~)
+    schema = sl_action_schema;
+    schema.label = '水平等间距';
+    schema.callback = @(~) slAlignBlocks([], 'hspace');
+end
+
+function schema = getAlignVSpace(~)
+    schema = sl_action_schema;
+    schema.label = '垂直等间距';
+    schema.callback = @(~) slAlignBlocks([], 'vspace');
+end
+
+function schema = getSizeItem(~)
+    schema = sl_action_schema;
+    schema.tag = 'SimuTidySize';
+    schema.label = '模块大小统一';
+    schema.callback = @(~) slUniformSize();
+end
+
+function schema = getNameItem(~)
+    schema = sl_container_schema;
+    schema.tag = 'SimuTidyName';
+    schema.label = '信号线命名';
+    schema.childrenFcns = {
+        @getNameBySource
+        @getNameBySourcePort
+        @getNameByOutport
+        @getNameClear
+    };
+end
+
+function schema = getNameBySource(~)
+    schema = sl_action_schema;
+    schema.label = '按源模块名命名';
+    schema.callback = @(~) slAutoNameSignals([], 'source');
+end
+
+function schema = getNameBySourcePort(~)
+    schema = sl_action_schema;
+    schema.label = '按源模块名+端口号命名';
+    schema.callback = @(~) slAutoNameSignals([], 'source_port');
+end
+
+function schema = getNameByOutport(~)
+    schema = sl_action_schema;
+    schema.label = '按输出端口命名';
+    schema.callback = @(~) slAutoNameSignals([], 'outport');
+end
+
+function schema = getNameClear(~)
+    schema = sl_action_schema;
+    schema.label = '清除所有命名';
+    schema.callback = @(~) slAutoNameSignals([], 'clear');
+end
+
+function schema = getSplitItem(~)
+    schema = sl_action_schema;
+    schema.tag = 'SimuTidySplit';
+    schema.label = '长连线拆 Goto/From';
+    schema.callback = @(~) slSplitGotoFrom();
+end
+
+function schema = getHighlightItem(~)
+    schema = sl_action_schema;
+    schema.tag = 'SimuTidyHighlight';
+    schema.label = '高亮未连接端口';
+    schema.callback = @(~) slHighlightUnconnected();
+end
+
+function schema = getGeneratePortsItem(~)
+    schema = sl_action_schema;
+    schema.tag = 'SimuTidyGeneratePorts';
+    schema.label = '生成接口';
+    schema.callback = @(~) slGeneratePorts();
+end
+
+function schema = getUpdateBlockNamesItem(~)
+    schema = sl_action_schema;
+    schema.tag = 'SimuTidyUpdateBlockNames';
+    schema.label = '更新模块名称';
+    schema.callback = @(~) slUpdateBlockNames();
+end
