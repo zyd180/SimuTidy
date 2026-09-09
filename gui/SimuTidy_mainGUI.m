@@ -28,23 +28,31 @@
                    'WindowStyle', 'normal');
 
     % ========== 顶部区域 ==========
-    % 标题
+    % 标题（3.2.0：宽度让位给右侧主题/引导按钮；字色入主题调色板）
     uilabel(fig, 'Text', 'SimuTidy Simulink 辅助工具', ...
-        'Position', [10, 590, 440, 24], 'FontSize', 15, ...
-        'FontWeight', 'bold', 'FontColor', [0.2 0.2 0.2], ...
+        'Position', [10, 590, 278, 24], 'FontSize', 15, ...
+        'FontWeight', 'bold', 'FontColor', cfg.colors.text, ...
         'HorizontalAlignment', 'center');
+
+    % 主题切换按钮（3.2.0 新增：写偏好后重建窗口，见 onToggleTheme）
+    uibutton(fig, 'push', 'Text', sltidy_iif(strcmp(cfg.themeName, 'light'), ...
+        '深色主题', '浅色主题'), ...
+        'Position', [292, 590, 74, 24], 'FontSize', 9, ...
+        'BackgroundColor', cfg.gui.bgColor, 'FontColor', cfg.colors.textSubtle, ...
+        'Tooltip', '在浅色/深色主题间切换（重启窗口生效，偏好自动记住）', ...
+        'ButtonPushedFcn', @(~,~) onToggleTheme(fig));
 
     % 使用引导按钮（随时重新查看新手引导）
     uibutton(fig, 'push', 'Text', '使用引导', ...
         'Position', [372, 590, 78, 24], 'FontSize', 9, ...
-        'BackgroundColor', cfg.gui.bgColor, 'FontColor', [0.35 0.35 0.35], ...
+        'BackgroundColor', cfg.gui.bgColor, 'FontColor', cfg.colors.textSubtle, ...
         'Tooltip', '重新查看新手引导', ...
         'ButtonPushedFcn', @(~,~) SimuTidy_onboarding());
 
-    % 模型标签
+    % 模型标签（3.2.0：字色入主题调色板）
     modelLabel = uilabel(fig, 'Text', sltidy_getModelName(), ...
         'Position', [10, 566, 440, 18], 'FontSize', 10, ...
-        'FontColor', [0.4 0.4 0.4], 'HorizontalAlignment', 'center');
+        'FontColor', cfg.colors.textSubtle, 'HorizontalAlignment', 'center');
 
     % ========== ❶ 视图与导出 ==========
     p1 = uipanel(fig, 'Title', '  视图与导出  ', ...
@@ -173,15 +181,15 @@
         'Tooltip', '高亮有未连接端口的模块及悬空信号线；再次运行刷新状态，已连接的自动取消高亮', ...
         'ButtonPushedFcn', @(~,~) onHighlightUnconnected(fig));
 
-    % 开发者信息
+    % 开发者信息（3.2.0：字色入主题调色板）
     uilabel(fig, 'Text', '开发者: Henry  |  1378099981@qq.com  |  github.com/zyd180', ...
         'Position', [10, 14, 440, 16], 'FontSize', 8, ...
-        'FontColor', [0.55 0.55 0.55], 'HorizontalAlignment', 'center');
+        'FontColor', cfg.colors.textFaint, 'HorizontalAlignment', 'center');
 
-    % 状态标签
+    % 状态标签（3.2.0：字色入主题调色板）
     statusLabel = uilabel(fig, 'Text', '就绪', ...
         'Position', [10, 36, 440, 18], 'FontSize', 9, ...
-        'FontColor', [0.5 0.5 0.5], 'HorizontalAlignment', 'center');
+        'FontColor', cfg.colors.textFaint, 'HorizontalAlignment', 'center');
 
     % 存储用户数据
     fig.UserData.statusLabel = statusLabel;
@@ -362,6 +370,26 @@ function refreshModelLabel(fig)
         end
     catch
     end
+end
+
+function onToggleTheme(fig)
+%onToggleTheme 主题切换（3.2.0 新增）
+%   写偏好 → 走定时器清理 → 销毁重建窗口。
+%   选择"重建"而非就地改色：控件数量多，且各回调闭包持有旧 cfg 快照，
+%   就地改色容易漏控件；重建走既有单例/定时器清理逻辑，最简单可靠
+    cfg = SimuTidy_config();
+    newTheme = sltidy_iif(strcmp(cfg.themeName, 'light'), 'dark', 'light');
+    try
+        setpref('SimuTidy', 'theme', newTheme);
+    catch
+    end
+    t = fig.UserData.timer;
+    if isvalid(t)
+        try, stop(t); catch, end
+        try, delete(t); catch, end
+    end
+    delete(fig);
+    SimuTidy_mainGUI();
 end
 
 function onClose(fig, t)
