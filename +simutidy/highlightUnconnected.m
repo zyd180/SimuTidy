@@ -1,9 +1,10 @@
-function highlightUnconnected(sys, clearFlag)
+function highlightUnconnected(sys, varargin)
 %highlightUnconnected 高亮显示未连接的端口
 %   （3.1.0 自 core/slHighlightUnconnected 迁入 +simutidy 包）
 %   simutidy.highlightUnconnected() - 高亮当前子系统未连接端口
 %   simutidy.highlightUnconnected(sys) - 高亮指定子系统
 %   simutidy.highlightUnconnected([], true) - 清除高亮
+%   simutidy.highlightUnconnected([], 'Progress', fig) - GUI 进度条
 %
 %   功能：
 %       首次运行：高亮所有未连接端口
@@ -15,12 +16,21 @@ function highlightUnconnected(sys, clearFlag)
 %   为当前层（见下），扫描本身的收益保留
 %   兼容：根目录 slHighlightUnconnected.m 为薄包装，行为契约不变
 
+    % 3.3.0 进度条：'Progress' 选项；clearFlag 位置参数与名值对共存。
+    % 只把 logical 位置参数识别为 clearFlag——第 2 参历史上只有 true/false，
+    % 若是 char 只能是 'Progress' 选项名，交给 parseOptions
+    if nargin > 1 && ~isempty(varargin) && islogical(varargin{1})
+        clearFlag = varargin{1};
+        varargin(1) = [];
+    end
+    opt = simutidy.internal.parseOptions(varargin, {'Progress'});
+
     % nargin 守卫必须在最顶部：零参调用时 sys 未定义，而 clearFlag 分支
     % 与 resolveSystem 都要用到它（原因详见 simutidy/alignBlocks.m 入口注释）
     if nargin < 1
         sys = gcs;
     end
-    if nargin < 2
+    if nargin < 2 || isempty(clearFlag)
         clearFlag = false;
     end
 
@@ -44,7 +54,18 @@ function highlightUnconnected(sys, clearFlag)
     blocks = find_system(sysPath, 'FindAll', 'on', 'SearchDepth', 1, 'Type', 'block');
     unconnectedCount = 0;
 
+    % 悬空信号线查询提前（3.3.0：进度条需要先知道总工作量）
+    lines = find_system(sysPath, 'FindAll', 'on', 'SearchDepth', 1, 'Type', 'line');
+    dlg = simutidy.internal.progress('start', opt.progress, ...
+        numel(blocks) + numel(lines), '高亮未连接端口');
+
     for i = 1:length(blocks)
+        keep = simutidy.internal.progress('step', dlg, ...
+            sprintf('检查模块 %d/%d', i, numel(blocks)));
+        if ~keep
+            simutidy.internal.log('warn', '已取消：模块检查到第 %d/%d 个。', i, numel(blocks));
+            break;
+        end
         ph = get_param(blocks(i), 'PortHandles');
         allPorts = [ph.Inport, ph.Outport, ph.Enable, ph.Trigger, ...
                     ph.State, ph.Ifaction, ph.Reset];
@@ -70,8 +91,13 @@ function highlightUnconnected(sys, clearFlag)
     end
 
     % 检测悬空信号线（同样限当前层，理由同上）
-    lines = find_system(sysPath, 'FindAll', 'on', 'SearchDepth', 1, 'Type', 'line');
     for i = 1:length(lines)
+        keep = simutidy.internal.progress('step', dlg, ...
+            sprintf('检查信号线 %d/%d', i, numel(lines)));
+        if ~keep
+            simutidy.internal.log('warn', '已取消：信号线检查到第 %d/%d 条。', i, numel(lines));
+            break;
+        end
         srcPortH = get_param(lines(i), 'SrcPortHandle');
         dstPortH = get_param(lines(i), 'DstPortHandle');
         if srcPortH == -1 || isempty(dstPortH)
@@ -86,6 +112,7 @@ function highlightUnconnected(sys, clearFlag)
             end
         end
     end
+    simutidy.internal.progress('done', dlg);
 
     % 3.3.0：汇总输出接入分级日志
     simutidy.internal.log('info', '高亮完成，共发现 %d 个有未连接端口的模块。', unconnectedCount);

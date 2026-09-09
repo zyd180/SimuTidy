@@ -1,4 +1,4 @@
-function res = splitGotoFrom(sys)
+function res = splitGotoFrom(sys, varargin)
 %splitGotoFrom 将选中的信号线批量拆分为 Goto/From 对
 %   （3.1.0 自 core/slSplitGotoFrom 迁入 +simutidy 包）
 %   simutidy.splitGotoFrom() - 拆分当前子系统选中的信号线（支持多选批量）
@@ -24,6 +24,11 @@ function res = splitGotoFrom(sys)
     end
     sysPath = simutidy.internal.resolveSystem(sys);
 
+    % 3.3.0 进度条：可选名值对 'Progress', <窗口句柄>——传有效窗口才弹
+    % uiprogressdlg（含取消）；命令行不传则零弹窗（理由见 internal/progress）
+    opt = simutidy.internal.parseOptions(varargin, {'Progress'});
+    progParent = opt.progress;
+
     selectedObjs = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'line');
     if isempty(selectedObjs)
         error('SimuTidy:noSelection', '请先选中要拆分的信号线。');
@@ -41,7 +46,16 @@ function res = splitGotoFrom(sys)
     % 3.3.0 结果反馈：收集失败对象（句柄+原因），供 GUI 结果面板"定位"
     failItems = struct('handle', {}, 'reason', {}, 'index', {});
 
+    dlg = simutidy.internal.progress('start', progParent, numel(selectedObjs), '拆分 Goto/From');
     for i = 1:length(selectedObjs)
+        % 3.3.0 进度条：步进 + 取消检查（取消后按已完成数量正常汇报）
+        keep = simutidy.internal.progress('step', dlg, ...
+            sprintf('拆分连线 %d/%d', i, numel(selectedObjs)));
+        if ~keep
+            simutidy.internal.log('warn', '已取消：完成 %d/%d 条。', ...
+                okCount, numel(selectedObjs));
+            break;
+        end
         try
             [cacheH, cacheR] = splitOneLine(selectedObjs(i), cfg, cacheH, cacheR);
             okCount = okCount + 1;
@@ -52,6 +66,7 @@ function res = splitGotoFrom(sys)
                 'reason', ME.message, 'index', i);
         end
     end
+    simutidy.internal.progress('done', dlg);
 
     % 3.1.0 收敛：汇总输出统一走 internal.report
     simutidy.internal.report('Goto/From 批量拆分', okCount, failCount, failInfo(1:failCount));

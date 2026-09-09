@@ -1,4 +1,4 @@
-function res = alignLinePorts(sys)
+function res = alignLinePorts(sys, varargin)
 %alignLinePorts 连线端口对齐（3.1.0 自 core/slAlignLinePorts 迁入 +simutidy 包）
 %   simutidy.alignLinePorts() - 将当前子系统选中的模块与其连线另一端端口水平对齐
 %   simutidy.alignLinePorts(sys) - 指定子系统
@@ -23,6 +23,9 @@ function res = alignLinePorts(sys)
     % 3.1.0 收敛：sys 校验样板统一走 internal.resolveSystem
     sysPath = simutidy.internal.resolveSystem(sys);
 
+    % 3.3.0 进度条：'Progress' 选项（仅 GUI 传窗口句柄时弹，见 internal/progress）
+    opt = simutidy.internal.parseOptions(varargin, {'Progress'});
+
     selBlocks = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'block');
     selLines = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'line');
     if isempty(selBlocks)
@@ -43,7 +46,14 @@ function res = alignLinePorts(sys)
     failItems = struct('handle', {}, 'reason', {}, 'index', {});
 
     % ===== 阶段1：基于初始几何计算每个选中模块的目标位置 =====
+    dlg = simutidy.internal.progress('start', opt.progress, n, '连线端口对齐');
     for i = 1:n
+        keep = simutidy.internal.progress('step', dlg, ...
+            sprintf('分析模块 %d/%d', i, n));
+        if ~keep
+            simutidy.internal.log('warn', '已取消：分析到第 %d/%d 个模块。', i, n);
+            break;
+        end
         try
             plans(i) = makePlan(selBlocks(i), selLines);
             hasPlan(i) = true;
@@ -54,6 +64,7 @@ function res = alignLinePorts(sys)
                 'reason', ME.message, 'index', i); %#ok<AGROW>
         end
     end
+    simutidy.internal.progress('done', dlg);
 
     % ===== 阶段2：虚拟布局碰撞裁决 =====
     % 虚拟布局：有计划的选中模块放在目标位置，其余保持原位

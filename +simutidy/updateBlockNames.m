@@ -1,4 +1,4 @@
-function updateBlockNames(sys)
+function updateBlockNames(sys, varargin)
 %updateBlockNames 更新Inport/Outport模块名称为信号名
 %   （3.1.0 自 core/slUpdateBlockNames 迁入 +simutidy 包）
 %   simutidy.updateBlockNames() - 更新当前打开的模型
@@ -31,6 +31,9 @@ function updateBlockNames(sys)
     % 而非 gcs，故默认值在调用前处理，resolveSystem 仅负责校验）
     sysPath = simutidy.internal.resolveSystem(sys);
 
+    % 3.3.0 进度条：'Progress' 选项（仅 GUI 传窗口句柄时弹）
+    opt = simutidy.internal.parseOptions(varargin, {'Progress'});
+
     % 3.1.0 性能优化：按 BlockType 定向查找，替代原"全块遍历 + 逐块取
     % BlockType 过滤"。普通模型里 IO 块占比极低，旧写法对每个非目标块
     % 都白取一次 BlockType；定向查询直接只返回目标块。
@@ -41,18 +44,34 @@ function updateBlockNames(sys)
     inportCount = 0;
     outportCount = 0;
 
+    % 3.3.0 进度条：两类目标合并计时
+    dlg = simutidy.internal.progress('start', opt.progress, ...
+        numel(inports) + numel(outports), '更新模块名称');
     for i = 1:length(inports)
+        if ~simutidy.internal.progress('step', dlg, ...
+                sprintf('Inport %d/%d', i, numel(inports)))
+            simutidy.internal.log('warn', '已取消：处理到第 %d 个 Inport。', i);
+            simutidy.internal.progress('done', dlg);
+            return;
+        end
         newName = resolveInportName(inports(i));
         if ~isempty(newName) && renameBlock(inports(i), newName)
             inportCount = inportCount + 1;
         end
     end
     for i = 1:length(outports)
+        if ~simutidy.internal.progress('step', dlg, ...
+                sprintf('Outport %d/%d', i, numel(outports)))
+            simutidy.internal.log('warn', '已取消：处理到第 %d 个 Outport。', i);
+            simutidy.internal.progress('done', dlg);
+            return;
+        end
         newName = resolveOutportName(outports(i));
         if ~isempty(newName) && renameBlock(outports(i), newName)
             outportCount = outportCount + 1;
         end
     end
+    simutidy.internal.progress('done', dlg);
 
     % 3.3.0：汇总输出接入分级日志
     simutidy.internal.log('info', '模块名称更新完成：Inport %d 个，Outport %d 个。', ...
