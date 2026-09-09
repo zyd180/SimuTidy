@@ -1,27 +1,52 @@
-function SimuTidy_makeIcons()
+function SimuTidy_makeIcons(variant)
 %SimuTidy_makeIcons 重新生成 Toolstrip 图标（resources/icons/*.png）
-%   SimuTidy_makeIcons() - 在 16/24 两档像素上重建全部 17 个图标
+%   SimuTidy_makeIcons()        - 浅色调色板，输出 resources/icons/
+%   SimuTidy_makeIcons('dark')  - 深色调色板（亮色变体），输出 resources/icons_dark/
+%                                 16/24 两档像素、同文件名
 %
 %   说明：
 %       - 纯基础 MATLAB 实现（imwrite 为基础函数），无需任何工具箱
-%       - 图形为扁平实心像素块，透明背景（RGBA），配色取自 SimuTidy_config 分区色
+%       - 图形为扁平实心像素块，透明背景（RGBA），配色取自 SimuTidy_config 主题调色板
 %       - 修改图标设计后重跑本脚本即可全部重新生成
+%
+%   3.2.0 深色变体说明（最小交付，见 CHANGELOG）：
+%       icons_dark/ 只是"能力储备"——Toolstrip JSON 的图标路径仍指向
+%       icons/；若确认深色 MATLAB 环境需要，把 simutidyTab_actions.json
+%       中 "icons/" 前缀改为 "icons_dark/" 并执行 slReloadToolstripConfig
+%       即可整体切换（约半天工作量，未随本版实现自动切换）
+
+    % 输出目录与调色板按变体决定（无参 = 浅色 = 既有行为，兼容旧调用）
+    if nargin < 1 || isempty(variant)
+        variant = 'light';
+    end
+    assert(any(strcmp(variant, {'light', 'dark'})), ...
+        'variant 只能是 ''light'' 或 ''dark''。');
 
     rootDir = fullfile(fileparts(mfilename('fullpath')), '..');
-    outDir = fullfile(rootDir, 'resources', 'icons');
+    outSub = sltidy_iif(strcmp(variant, 'dark'), 'icons_dark', 'icons');
+    outDir = fullfile(rootDir, 'resources', outSub);
     if ~exist(outDir, 'dir')
         mkdir(outDir);
     end
 
     cfg = SimuTidy_config();
-    col.export = cfg.colors.export;
-    col.module = cfg.colors.module;
-    col.moduleDark = cfg.colors.moduleDark;
-    col.line = cfg.colors.line;
-    col.lineDark = cfg.colors.lineDark;
-    col.port = cfg.colors.port;
-    col.portDark = cfg.colors.portDark;
-    col.check = cfg.colors.check;
+    pal = cfg.themes.(variant);   % 直接取指定主题的调色板（与用户当前偏好解耦）
+    col.export = pal.export;
+    col.module = pal.module;
+    col.moduleDark = pal.moduleDark;
+    col.line = pal.line;
+    col.lineDark = pal.lineDark;
+    col.port = pal.port;
+    col.portDark = pal.portDark;
+    col.check = pal.check;
+
+    % 3.2.0 修复（2.7.0 起潜伏的存量 bug）：调色板是 0~1 浮点，直接赋给
+    % uint8 画布会被截断成 0（uint8(0.169)=0），导致所有图标自诞生起
+    % 就是近黑色。必须先按 255 缩放取整再进画布
+    flds = fieldnames(col);
+    for i = 1:numel(flds)
+        col.(flds{i}) = uint8(round(col.(flds{i}) * 255));
+    end
 
     % 图标名 → 所属分区色
     map = { ...

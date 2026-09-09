@@ -3,7 +3,7 @@ function cfg = SimuTidy_config()
 %   所有可调参数集中管理，修改此文件即可全局生效
 
     %% 版本信息
-    cfg.version = '3.1.0';
+    cfg.version = '3.2.0';
     cfg.versionDate = '2026-09-08';
     
     %% Goto/From模块配置

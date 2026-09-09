@@ -184,6 +184,10 @@ SimuTidy/
 ```matlab
 cfg = SimuTidy_config();
 
+% 主题（3.2.0）：主窗口"主题"按钮切换，偏好自动记住；
+% 也可命令行切换后重开主窗口
+setpref('SimuTidy', 'theme', 'dark')   % 'light'（默认）/ 'dark'
+
 % Goto/From 模块配置
 cfg.goto.defaultWidth = 60;    % 默认宽度
 cfg.goto.defaultHeight = 30;   % 默认高度
