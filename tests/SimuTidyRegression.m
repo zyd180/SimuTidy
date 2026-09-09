@@ -73,11 +73,21 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
         end
 
         function restoreUserConfig(tc, up, backup, hadBefore) %#ok<INUSL>
-            % 3.3.0 测试辅助：还原真实 userpath 下的用户配置文件
-            if hadBefore && isfile(backup)
-                movefile(backup, up);
-            else
-                if isfile(up), delete(up); end
+            % 3.3.0 测试辅助：还原真实 userpath 下的用户配置文件。
+            % movefile 可能因文件占用报错（MATLAB 内部句柄延迟释放），
+            % 失败时兜底直接删除测试残留，绝不外抛
+            try
+                if hadBefore && isfile(backup)
+                    if isfile(up), delete(up); end
+                    movefile(backup, up);
+                else
+                    if isfile(up), delete(up); end
+                end
+            catch
+                try
+                    if isfile(up), delete(up); end
+                catch
+                end
             end
         end
 
@@ -503,6 +513,29 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
             simutidy.internal.setLogSink([]);
             simutidy.internal.log('warn', 'after-clear');
             tc.verifyEqual(numel(tc.sinkMsgs), 2, '清除后不应再转发');
+        end
+
+        function testResultFeedback(tc)
+            % 3.3.0 结果反馈：批量操作可选输出 res（GUI 面板依赖此结构）
+            mdl = tc.ModelName;
+            % 成功路径：拆分 res 全零失败
+            tc.addAndConnect([100 100 140 140], [500 100 540 140]);
+            tc.selectLines();
+            res = simutidy.splitGotoFrom(mdl);
+            tc.verifyEqual(res.failCount, 0, '正常拆分不应有失败');
+            tc.verifyEqual(res.okCount, 1);
+            tc.verifyEqual(res.op, 'Goto/From 批量拆分');
+
+            % 失败路径：选中无连线块 → 端口对齐失败并带可定位句柄
+            add_block('built-in/Gain', [mdl '/Lonely'], 'Position', [100 300 140 340]);
+            set_param([mdl '/Lonely'], 'Selected', 'on');
+            res2 = simutidy.alignLinePorts(mdl);
+            tc.verifyEqual(res2.failCount, 1, '无连线块应失败');
+            % 句柄是 double，有效性用 ishandle（isvalid 只用于对象）
+            tc.verifyTrue(ishandle(res2.failItems(1).handle), '失败对象句柄应有效');
+            tc.verifyEqual(get_param(res2.failItems(1).handle, 'Name'), 'Lonely', ...
+                '句柄应指向失败对象本身');
+            tc.verifySubstring(res2.failItems(1).reason, '连线');
         end
     end
 end

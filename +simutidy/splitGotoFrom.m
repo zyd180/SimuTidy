@@ -1,4 +1,4 @@
-function splitGotoFrom(sys)
+function res = splitGotoFrom(sys)
 %splitGotoFrom 将选中的信号线批量拆分为 Goto/From 对
 %   （3.1.0 自 core/slSplitGotoFrom 迁入 +simutidy 包）
 %   simutidy.splitGotoFrom() - 拆分当前子系统选中的信号线（支持多选批量）
@@ -31,13 +31,15 @@ function splitGotoFrom(sys)
 
     % 模块位置缓存（推块后同步更新，用于碰撞检查）
     cacheH = find_system(sysPath, 'FindAll', 'on', 'SearchDepth', 1, 'Type', 'block');
-    % 3.1.0 性能优化：位置批量读取，1 次 API 调用替代逐块 N 次
-    cacheR = cell2mat(get_param(cacheH, 'Position'));
+    % 3.1.0 性能优化：位置批量读取（3.3.0 起经 batchPositions 兼容单块子系统）
+    cacheR = simutidy.internal.batchPositions(cacheH);
 
     cfg = SimuTidy_config();
     okCount = 0;
     failCount = 0;
     failInfo = cell(1, length(selectedObjs));
+    % 3.3.0 结果反馈：收集失败对象（句柄+原因），供 GUI 结果面板"定位"
+    failItems = struct('handle', {}, 'reason', {}, 'index', {});
 
     for i = 1:length(selectedObjs)
         try
@@ -46,11 +48,18 @@ function splitGotoFrom(sys)
         catch ME
             failCount = failCount + 1;
             failInfo{failCount} = sprintf('  连线%d: %s', i, ME.message);
+            failItems(failCount) = struct('handle', selectedObjs(i), ...
+                'reason', ME.message, 'index', i);
         end
     end
 
     % 3.1.0 收敛：汇总输出统一走 internal.report
     simutidy.internal.report('Goto/From 批量拆分', okCount, failCount, failInfo(1:failCount));
+
+    % 3.3.0 结果反馈：res 为可选输出（GUI 弹面板定位失败项；
+    % 命令行不接输出则与旧版行为完全一致）
+    res = struct('op', 'Goto/From 批量拆分', 'okCount', okCount, ...
+        'failCount', failCount, 'failItems', failItems);
 end
 
 %% ========================================================================

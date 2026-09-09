@@ -23,8 +23,8 @@ function uniformSize(sys, mode)
     end
 
     n = length(selectedObjs);
-    % 3.1.0 性能优化：位置批量读取（同 simutidy.alignBlocks，1 次 API 调用替代 N 次）
-    positions = cell2mat(get_param(selectedObjs, 'Position'));
+    % 3.1.0 性能优化：位置批量读取（3.3.0 起经 batchPositions 归一）
+    positions = simutidy.internal.batchPositions(selectedObjs);
 
     widths  = positions(:, 3) - positions(:, 1);
     heights = positions(:, 4) - positions(:, 2);

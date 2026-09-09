@@ -1,4 +1,4 @@
-function autoNameSignals(sys, mode)
+function res = autoNameSignals(sys, mode)
 %autoNameSignals 信号线自动命名（3.1.0 自 core/slAutoNameSignals 迁入 +simutidy 包）
 %   simutidy.autoNameSignals() - 按源模块名命名当前子系统的信号线
 %   simutidy.autoNameSignals(sys, mode) - 指定命名模式：
@@ -30,6 +30,9 @@ function autoNameSignals(sys, mode)
     cfg = SimuTidy_config();
 
     namedCount = 0;
+    % 3.3.0 结果反馈：静默失败原先是 try/catch 吞掉（计数也不增），
+    % 现在收集进 res 供 GUI 面板定位；命令行不接输出行为不变
+    failItems = struct('handle', {}, 'reason', {}, 'index', {});
     for i = 1:length(lineHandles)
         lineH = lineHandles(i);
         try
@@ -42,7 +45,9 @@ function autoNameSignals(sys, mode)
             try
                 set_param(lineH, 'Name', '');
                 namedCount = namedCount + 1;
-            catch
+            catch ME
+                failItems(end+1) = struct('handle', lineH, ...
+                    'reason', ME.message, 'index', i); %#ok<AGROW>
             end
             continue;
         end
@@ -84,12 +89,18 @@ function autoNameSignals(sys, mode)
         try
             set_param(lineH, 'Name', newName);
             namedCount = namedCount + 1;
-        catch
+        catch ME
+            failItems(end+1) = struct('handle', lineH, ...
+                'reason', ME.message, 'index', i); %#ok<AGROW>
         end
     end
 
     % 3.3.0：汇总输出接入分级日志（原 fprintf）
     simutidy.internal.log('info', '%s 完成，共处理 %d 条信号线。', modeLabel(mode), namedCount);
+
+    % 3.3.0 结果反馈：可选输出
+    res = struct('op', '信号线自动命名', 'okCount', namedCount, ...
+        'failCount', numel(failItems), 'failItems', failItems);
 end
 
 function txt = modeLabel(mode)

@@ -72,12 +72,13 @@ function doName(parentFig, dlg, mode) %#ok<INUSL>
         drawnow;
     end
     try
-        % 3.1.0 命名空间化：GUI 内部调用直调 +simutidy 包实体（理由见主窗口 doAlign 注释）
-        simutidy.autoNameSignals([], mode);
+        % 3.3.0 命名空间化 + 结果反馈：直调包实体并接 res（失败弹结果面板）
+        res = simutidy.autoNameSignals([], mode);
         if hasStatus
             sl.Text = [mt '命名完成'];
             sl.FontColor = cfg.colors.success;
         end
+        SimuTidy_resultPanel(res);
     catch ME
         if hasStatus
             sl.Text = ['错误: ' ME.message];

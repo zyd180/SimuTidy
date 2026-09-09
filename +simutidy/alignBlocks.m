@@ -36,8 +36,9 @@ function alignBlocks(sys, alignType)
     n = length(selectedObjs);
     % 3.1.0 性能优化：位置批量读取。原为逐块 get_param（N 次 API 调用），
     % 向量化后 1 次调用返回 cell；块数越多收益越大。
-    % 注意：cell2mat 要求所有返回均为 1x4，Position 天然满足
-    positions = cell2mat(get_param(selectedObjs, 'Position'));
+    % （3.3.0 起经 batchPositions 归一，顺带兼容"选中恰好 1 块"的输入形态；
+    %  虽然 <2 已在上游报错，防御层收敛到一处）
+    positions = simutidy.internal.batchPositions(selectedObjs);
 
     lefts   = positions(:, 1);
     tops    = positions(:, 2);

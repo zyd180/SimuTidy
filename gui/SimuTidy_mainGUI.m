@@ -270,9 +270,11 @@ function onAlignLinePorts(fig)
     cfg = SimuTidy_config();
     sl.Text = '正在端口对齐...'; sl.FontColor = cfg.colors.lineDark; drawnow;
     try
-        simutidy.alignLinePorts();
+        % 3.3.0 结果反馈：接 res，失败明细弹非模态面板（可一键定位）
+        res = simutidy.alignLinePorts();
         sl.Text = '连线端口对齐完成';
         sl.FontColor = cfg.colors.success;
+        SimuTidy_resultPanel(res);
     catch ME
         sl.Text = ['错误: ' ME.message]; sl.FontColor = cfg.colors.error;
     end
@@ -296,9 +298,11 @@ function onSplitGoto(fig)
     cfg = SimuTidy_config();
     sl.Text = '正在拆分...'; sl.FontColor = cfg.colors.line; drawnow;
     try
-        simutidy.splitGotoFrom();
+        % 3.3.0 结果反馈：接 res（同 onAlignLinePorts）
+        res = simutidy.splitGotoFrom();
         sl.Text = '拆分完成';
         sl.FontColor = cfg.colors.success;
+        SimuTidy_resultPanel(res);
     catch ME
         sl.Text = ['错误: ' ME.message]; sl.FontColor = cfg.colors.error;
     end

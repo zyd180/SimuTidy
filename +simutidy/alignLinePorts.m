@@ -1,4 +1,4 @@
-function alignLinePorts(sys)
+function res = alignLinePorts(sys)
 %alignLinePorts 连线端口对齐（3.1.0 自 core/slAlignLinePorts 迁入 +simutidy 包）
 %   simutidy.alignLinePorts() - 将当前子系统选中的模块与其连线另一端端口水平对齐
 %   simutidy.alignLinePorts(sys) - 指定子系统
@@ -31,14 +31,16 @@ function alignLinePorts(sys)
 
     % 模块位置缓存
     cacheH = find_system(sysPath, 'FindAll', 'on', 'SearchDepth', 1, 'Type', 'block');
-    % 3.1.0 性能优化：位置批量读取，1 次 API 调用替代逐块 N 次
-    cacheR = cell2mat(get_param(cacheH, 'Position'));
+    % 3.1.0 性能优化：位置批量读取（3.3.0 起经 batchPositions 兼容单块子系统）
+    cacheR = simutidy.internal.batchPositions(cacheH);
 
     n = numel(selBlocks);
     plans = repmat(struct('blockH', 0, 'dy', 0, 'newPos', zeros(1, 4)), 1, n);
     hasPlan = false(1, n);
     skipped = false(1, n);
     failInfo = cell(1, n);
+    % 3.3.0 结果反馈：失败对象收集（块句柄+原因），供结果面板定位
+    failItems = struct('handle', {}, 'reason', {}, 'index', {});
 
     % ===== 阶段1：基于初始几何计算每个选中模块的目标位置 =====
     for i = 1:n
@@ -48,6 +50,8 @@ function alignLinePorts(sys)
         catch ME
             skipped(i) = true;
             failInfo{i} = sprintf('  模块%d: %s', i, ME.message);
+            failItems(end+1) = struct('handle', selBlocks(i), ...
+                'reason', ME.message, 'index', i); %#ok<AGROW>
         end
     end
 
@@ -72,6 +76,9 @@ function alignLinePorts(sys)
         if simutidy.internal.collidesAny(plans(i).newPos, plans(i).blockH, cacheH, virtR)
             skipped(i) = true;
             failInfo{i} = sprintf('  模块%d: 垂直移动会与周围模块重叠（已跳过，未做任何修改）。', i);
+            failItems(end+1) = struct('handle', plans(i).blockH, ...
+                'reason', '垂直移动会与周围模块重叠（已跳过，未做任何修改）', ...
+                'index', i); %#ok<AGROW>
             % 裁决失败：该模块回落原位置，后续检查将其视为不动
             idx = find(cacheH == plans(i).blockH, 1);
             if ~isempty(idx)
@@ -101,6 +108,10 @@ function alignLinePorts(sys)
     % 3.1.0 收敛：汇总输出统一走 internal.report（原先各函数自行拼接）
     failInfo = failInfo(cellfun(@(s) ~isempty(s), failInfo));
     simutidy.internal.report('连线端口对齐', okCount, failCount, failInfo);
+
+    % 3.3.0 结果反馈：可选输出（GUI 弹面板定位失败项，命令行行为不变）
+    res = struct('op', '连线端口对齐', 'okCount', okCount, ...
+        'failCount', failCount, 'failItems', failItems);
 
     % 3.1.0 性能优化：移除 update——本函数只改块 y 坐标并拉直线点，
     % 均为纯几何变化，Simulink 自动重排；编译刷新浪费（理由详见
