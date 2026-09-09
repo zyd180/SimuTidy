@@ -44,7 +44,10 @@
     top.Layout.Row = 1;
     top.Layout.Column = 1;
     top.ColumnWidth = {'1x', 76, 78};
-    top.RowHeight = {30};
+    % 3.3.1：嵌套 grid 必须显式 Padding=0——默认 8px 内边距会把 34px 行
+    % 吃剩 18px，主题/引导按钮下边缘被裁（与底部"设置"按钮同根因）
+    top.RowHeight = {34};
+    top.Padding = [0, 0, 0, 0];
 
     uilabel(top, 'Text', 'SimuTidy Simulink 辅助工具', ...
         'FontSize', 15, 'FontWeight', 'bold', 'FontColor', cfg.colors.text, ...
