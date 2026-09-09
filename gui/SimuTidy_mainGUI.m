@@ -351,7 +351,12 @@ function refreshModelLabel(fig)
     if ~isfield(fig.UserData, 'modelLabel'), return; end
     if ~isvalid(fig.UserData.modelLabel), return; end
     try
-        fig.UserData.modelLabel.Text = sltidy_getModelName();
+        % 3.1.0 性能优化：文本未变化时不再 set。定时器每秒触发，set 同值
+        % 也会触发控件重绘事件，模型不变时是纯浪费
+        txt = sltidy_getModelName();
+        if ~strcmp(fig.UserData.modelLabel.Text, txt)
+            fig.UserData.modelLabel.Text = txt;
+        end
     catch
     end
 end

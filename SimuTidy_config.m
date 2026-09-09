@@ -39,5 +39,9 @@ function cfg = SimuTidy_config()
     cfg.colors.error      = [0.780 0.290 0.259];  % 状态-出错 #C74A42
     
     %% Simulink API配置
+    % 3.1.0 语义变更：此开关只对"需要编译校验"的操作生效（信号对象解析、
+    % 生成接口）。纯几何操作（对齐/大小统一/端口对齐）不再触发 update——
+    % 移动块后 Simulink 自动重排连线，编译刷新纯属浪费（500 块实测单次
+    % ~0.16s）。变更理由详见 CHANGELOG 3.1.0 性能优化条目。
     cfg.simulink.updateAfterChange = true;  % 修改后是否自动更新模型
 end

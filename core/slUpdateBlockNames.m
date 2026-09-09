@@ -27,24 +27,26 @@ function slUpdateBlockNames(sys)
         error('无效的子系统句柄或路径。');
     end
 
-    blocks = find_system(sys, 'FindAll', 'on', 'Type', 'block');
+    % 3.1.0 性能优化：按 BlockType 定向查找，替代原"全块遍历 + 逐块取
+    % BlockType 过滤"。普通模型里 IO 块占比极低，旧写法对每个非目标块
+    % 都白取一次 BlockType；定向查询直接只返回目标块。
+    % 注意保持全层递归语义不变（本功能设计为处理整个模型/子系统树）
+    inports  = find_system(sys, 'FindAll', 'on', 'BlockType', 'Inport');
+    outports = find_system(sys, 'FindAll', 'on', 'BlockType', 'Outport');
 
     inportCount = 0;
     outportCount = 0;
 
-    for i = 1:length(blocks)
-        blockH = blocks(i);
-        switch get_param(blockH, 'BlockType')
-            case 'Inport'
-                newName = resolveInportName(blockH);
-                if ~isempty(newName) && renameBlock(blockH, newName)
-                    inportCount = inportCount + 1;
-                end
-            case 'Outport'
-                newName = resolveOutportName(blockH);
-                if ~isempty(newName) && renameBlock(blockH, newName)
-                    outportCount = outportCount + 1;
-                end
+    for i = 1:length(inports)
+        newName = resolveInportName(inports(i));
+        if ~isempty(newName) && renameBlock(inports(i), newName)
+            inportCount = inportCount + 1;
+        end
+    end
+    for i = 1:length(outports)
+        newName = resolveOutportName(outports(i));
+        if ~isempty(newName) && renameBlock(outports(i), newName)
+            outportCount = outportCount + 1;
         end
     end
 

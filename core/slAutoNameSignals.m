@@ -34,6 +34,10 @@ function slAutoNameSignals(sys, mode)
         lineHandles = selectedObjs;
     end
 
+    % 3.1.0 性能优化：cfg 调用提升到循环外。原实现在每条线的处理里都调
+    % SimuTidy_config()（N 次重复构造配置结构），纯浪费
+    cfg = SimuTidy_config();
+
     namedCount = 0;
     for i = 1:length(lineHandles)
         lineH = lineHandles(i);
@@ -57,8 +61,7 @@ function slAutoNameSignals(sys, mode)
 
         srcBlockH = get_param(srcPortH, 'Parent');
         srcBlockName = get_param(srcBlockH, 'Name');
-        
-        cfg = SimuTidy_config();
+
         srcBlockName = regexprep(srcBlockName, cfg.naming.replaceChars, cfg.naming.replaceWith);
         portNum = get_param(srcPortH, 'PortNumber');
 

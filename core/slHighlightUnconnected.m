@@ -35,7 +35,11 @@ function slHighlightUnconnected(sys, clearFlag)
     clearAllHighlights(sys);
     
     % 步骤2：重新检测并高亮未连接端口
-    blocks = find_system(sys, 'FindAll', 'on', 'Type', 'block');
+    % 3.1.0 行为修正：加 SearchDepth=1 限定当前层。原实现递归全模型，
+    % 把子层块混入当前层诊断（帮助文档本就声明"当前子系统"），且全层
+    % 递归在大模型上显著变慢；高亮依赖 Simulink 逐块机制，性能豁免，
+    % 但扫描范围收敛为当前层
+    blocks = find_system(sys, 'FindAll', 'on', 'SearchDepth', 1, 'Type', 'block');
     unconnectedCount = 0;
 
     for i = 1:length(blocks)
@@ -63,8 +67,8 @@ function slHighlightUnconnected(sys, clearFlag)
         end
     end
 
-    % 检测悬空信号线
-    lines = find_system(sys, 'FindAll', 'on', 'Type', 'line');
+    % 检测悬空信号线（同样限当前层，理由同上）
+    lines = find_system(sys, 'FindAll', 'on', 'SearchDepth', 1, 'Type', 'line');
     for i = 1:length(lines)
         srcPortH = get_param(lines(i), 'SrcPortHandle');
         dstPortH = get_param(lines(i), 'DstPortHandle');

@@ -33,10 +33,8 @@ function slUniformSize(sys, mode)
     end
 
     n = length(selectedObjs);
-    positions = zeros(n, 4);
-    for i = 1:n
-        positions(i, :) = get_param(selectedObjs(i), 'Position');
-    end
+    % 3.1.0 性能优化：位置批量读取（同 slAlignBlocks，1 次 API 调用替代 N 次）
+    positions = cell2mat(get_param(selectedObjs, 'Position'));
 
     widths  = positions(:, 3) - positions(:, 1);
     heights = positions(:, 4) - positions(:, 2);
@@ -66,17 +64,17 @@ function slUniformSize(sys, mode)
         newTop    = centersY(i) - targetH / 2;
         newBottom = centersY(i) + targetH / 2;
         newPos = [newLeft, newTop, newRight, newBottom];
+        % 3.1.0 性能优化：尺寸已是目标值则跳过写入（幂等）。带连线的块
+        % 每次 set_param(Position) 都触发 Simulink 内部连线重排，能省则省
+        if isequal(newPos, positions(i, :))
+            continue;
+        end
         set_param(selectedObjs(i), 'Position', newPos);
     end
 
     fprintf('模块大小统一完成（%s: W=%d, H=%d），共调整 %d 个模块。\n', ...
         mode, targetW, targetH, n);
-    
-    cfg = SimuTidy_config();
-    if cfg.simulink.updateAfterChange
-        try
-            set_param(sys, 'SimulationCommand', 'update');
-        catch
-        end
-    end
+
+    % 3.1.0 性能优化：移除 update——纯几何改尺寸后 Simulink 自动重排连线，
+    % 编译刷新浪费整模型编译时间（理由详见 slAlignBlocks 同名注释）
 end

@@ -28,10 +28,8 @@ function slAlignLinePorts(sys)
 
     % 模块位置缓存
     cacheH = find_system(sys, 'FindAll', 'on', 'SearchDepth', 1, 'Type', 'block');
-    cacheR = zeros(numel(cacheH), 4);
-    for k = 1:numel(cacheH)
-        cacheR(k, :) = get_param(cacheH(k), 'Position');
-    end
+    % 3.1.0 性能优化：位置批量读取，1 次 API 调用替代逐块 N 次
+    cacheR = cell2mat(get_param(cacheH, 'Position'));
 
     n = numel(selBlocks);
     plans = repmat(struct('blockH', 0, 'dy', 0, 'newPos', zeros(1, 4)), 1, n);
@@ -103,13 +101,9 @@ function slAlignLinePorts(sys)
         end
     end
 
-    cfg = SimuTidy_config();
-    if cfg.simulink.updateAfterChange
-        try
-            set_param(sys, 'SimulationCommand', 'update');
-        catch
-        end
-    end
+    % 3.1.0 性能优化：移除 update——本函数只改块 y 坐标并拉直线点，
+    % 均为纯几何变化，Simulink 自动重排；编译刷新浪费（理由详见
+    % slAlignBlocks 同名注释）
 end
 
 %% ========================================================================
@@ -222,9 +216,13 @@ function straightenBlockLines(blockH)
         else
             newPts(2:m, 2) = pts(m, 2);
         end
-        try
-            set_param(lh, 'Points', newPts);
-        catch
+        % 3.1.0 性能优化：已平直的线跳过 Points 写入。Points 写入逐条产生
+        % undo 记录，全选场景下几百条未变化的线可全部省掉
+        if ~isequal(newPts, pts)
+            try
+                set_param(lh, 'Points', newPts);
+            catch
+            end
         end
     end
 end
