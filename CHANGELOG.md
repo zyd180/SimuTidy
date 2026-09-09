@@ -18,6 +18,10 @@
 - **旧窗口尺寸偏好裁底**：gridlayout 固定行高合计 ~660px，默认/记忆高度
   620 会裁掉底部分区 → 默认窗口加高至 700，记忆值下限同步抬到 700
   （旧偏好自动被抬升，无需用户清理）
+- **测试不再写真实用户配置**：`testUserConfigOverride` 曾直接在
+  userpath 上做备份/还原，文件锁导致坏 JSON 残留、用户每次启动报警告
+  → `userConfig('path')` 新增 `SIMUTIDY_USERCONFIG` 环境变量覆盖，
+  测试重定向到临时目录，备份/还原机制整体删除
 - 经验沉淀（写给后续改布局的人）：uifigure 高 DPI 下控件最小尺寸变大，
   gridlayout 固定行高必须留余量；嵌套 grid 的 Padding/行高会吃外层空间，
   用嵌套必显式设 RowHeight；程序化读取按钮 Position 判断"是否被裁"要在

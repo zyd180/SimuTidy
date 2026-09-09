@@ -32,6 +32,13 @@ function varargout = userConfig(cmd, vals)
 
     switch cmd
         case 'path'
+            % 3.3.1：测试用环境变量覆盖——测试绝不写真实用户文件（教训：
+            % 真实路径上备份/还原曾因文件锁残留坏 JSON，用户每次启动报警告）
+            ov = getenv('SIMUTIDY_USERCONFIG');
+            if ~isempty(ov)
+                varargout{1} = ov;
+                return;
+            end
             up = userpath;
             if isempty(up)
                 up = fullfile(getenv('USERPROFILE'), 'Documents', 'MATLAB');

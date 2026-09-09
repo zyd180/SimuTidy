@@ -72,25 +72,6 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
             end
         end
 
-        function restoreUserConfig(tc, up, backup, hadBefore) %#ok<INUSL>
-            % 3.3.0 测试辅助：还原真实 userpath 下的用户配置文件。
-            % movefile 可能因文件占用报错（MATLAB 内部句柄延迟释放），
-            % 失败时兜底直接删除测试残留，绝不外抛
-            try
-                if hadBefore && isfile(backup)
-                    if isfile(up), delete(up); end
-                    movefile(backup, up);
-                else
-                    if isfile(up), delete(up); end
-                end
-            catch
-                try
-                    if isfile(up), delete(up); end
-                catch
-                end
-            end
-        end
-
         function captureSink(tc, msg, lv)
             tc.sinkMsgs{end+1} = sprintf('%s|%s', lv, msg); %#ok<AGROW>
         end
@@ -467,15 +448,14 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
     methods (Test)
         function testUserConfigOverride(tc)
             % 白名单覆盖生效 + 非白名单键跳过 + 坏文件回落默认。
-            % 说明：写入的是真实 userpath 文件（测试后还原/删除）——
-            % 该文件本来就是"用户机器级"，无沙箱替代方案。
-            % JSON 用嵌套对象：jsondecode 会把平铺点键名（"goto.gap"）
-            % 改写为合法标识符，平铺方案无法往返（3.3.0 踩坑定稿）
-            up = simutidy.internal.userConfig('path');
-            hadBefore = isfile(up);
-            backup = [up '.tstbak'];
-            if hadBefore, copyfile(up, backup); end
-            onCleanup(@() tc.restoreUserConfig(up, backup, hadBefore));
+            % 3.3.1：走 SIMUTIDY_USERCONFIG 环境变量把配置文件重定向到
+            % 临时目录——绝不碰真实用户文件（教训：旧版在真实路径上做
+            % 备份/还原，文件锁导致坏 JSON 残留，用户启动即报警告）
+            up = fullfile(tempdir, 'SimuTidy_test_config.json');
+            setenv('SIMUTIDY_USERCONFIG', up);
+            % 收尾不走 onCleanup：TestCase 的双参方法会被框架误认成
+            % 参数化测试。临时文件即使断言失败漏删也只是 tempdir 垃圾，
+            % 下次运行 fopen('w') 会覆盖
 
             json = ['{' newline ...
                 '  "goto": {"gap": 77, "gapBad": "x"},' newline ...
@@ -496,6 +476,10 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
             fid = fopen(up, 'w'); fwrite(fid, '{bad json'); fclose(fid);
             cfg2 = SimuTidy_config();
             tc.verifyEqual(cfg2.goto.gap, 40, '坏文件应回落默认值');
+
+            % 收尾：清环境变量 + 删临时文件
+            setenv('SIMUTIDY_USERCONFIG', '');
+            if isfile(up), delete(up); end
         end
 
         function testLogSink(tc)
