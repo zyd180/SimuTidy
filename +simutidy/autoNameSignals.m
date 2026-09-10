@@ -5,7 +5,13 @@ function res = autoNameSignals(sys, mode)
 %       'source'      - 按源模块名命名（默认）
 %       'source_port' - 按源模块名+端口号命名
 %       'outport'     - 按输出端口命名
-%       'clear'       - 清除所有信号线命名
+%       'clear'       - 清除命名（既有语义：选中线优先，未选则全线）
+%       'clear_sel'   - 3.4.0 新增：只清除**选中**的信号线；一条都没选中
+%                       时不做任何处理，仅 WARN 提醒（不报错不回落全线，
+%                       避免误清其他线）
+%       'clear_all'   - 3.4.0 新增：无视选中状态，清除**当前层级全部**
+%                       信号线命名（SearchDepth=1；GUI"清除所有"按钮
+%                       经二次确认后调用）
 %   兼容：根目录 slAutoNameSignals.m 为薄包装，行为契约不变
 
     % nargin 守卫必须在把 sys 传入 resolveSystem **之前**（原因见
@@ -20,10 +26,30 @@ function res = autoNameSignals(sys, mode)
     end
 
     selectedObjs = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'line');
-    if isempty(selectedObjs)
-        lineHandles = find_system(sysPath, 'FindAll', 'on', 'Type', 'line');
-    else
-        lineHandles = selectedObjs;
+    % 3.4.0 清除类模式分流（clear_sel / clear_all，语义见文件头；既有
+    % 'clear' 的"选中优先、未选回落全线"行为原样保留，兼容不变）
+    switch mode
+        case 'clear_sel'
+            if isempty(selectedObjs)
+                % 用户要求：没选中就什么都不做，只提醒。用 warn 级日志
+                % （命令行 + GUI 状态栏琥珀色都可见），不抛错
+                simutidy.internal.log('warn', '未选中任何信号线，未做处理。');
+                res = struct('op', '清除所选信号线命名', 'okCount', 0, ...
+                    'failCount', 0, 'failItems', ...
+                    struct('handle', {}, 'reason', {}, 'index', {}));
+                return;
+            end
+            lineHandles = selectedObjs;
+        case 'clear_all'
+            % 无视选中状态清当前层全部线（与 'clear' 的选中优先语义区分）
+            lineHandles = find_system(sysPath, 'FindAll', 'on', 'SearchDepth', 1, ...
+                'Type', 'line');
+        otherwise
+            if isempty(selectedObjs)
+                lineHandles = find_system(sysPath, 'FindAll', 'on', 'Type', 'line');
+            else
+                lineHandles = selectedObjs;
+            end
     end
 
     % 3.1.0 性能优化：cfg 调用提升到循环外（原实现每条线构造一次配置）
@@ -41,7 +67,8 @@ function res = autoNameSignals(sys, mode)
             continue;
         end
 
-        if strcmp(mode, 'clear')
+        % 3.4.0：clear_sel / clear_all 与 clear 走同一条清名路径
+        if any(strcmp(mode, {'clear', 'clear_sel', 'clear_all'}))
             try
                 set_param(lineH, 'Name', '');
                 namedCount = namedCount + 1;
@@ -104,11 +131,14 @@ function res = autoNameSignals(sys, mode)
 end
 
 function txt = modeLabel(mode)
-% 本函数内的模式文案（3.1.0 迁移时保留原输出格式不变）
+% 本函数内的模式文案（3.1.0 迁移时保留原输出格式不变；3.4.0 增补清除类两模式）
     switch mode
         case 'clear',       txt = '清除命名';
+        case 'clear_sel',   txt = '清除所选线命名';
+        case 'clear_all',   txt = '清除当前层全部命名';
         case 'outport',     txt = '按输出端口命名';
-        case 'source_port', txt = '按源模块+端口命名';
+        case 'source_port', txt = '按源模块名+端口号命名';
         otherwise,          txt = '按源模块命名';
     end
 end
+

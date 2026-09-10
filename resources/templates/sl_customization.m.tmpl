@@ -17,6 +17,8 @@ function schemas = getSimuTidyItems(~)
         @getNameItem
         @getSplitItem
         @getHighlightItem
+        @getCheckOverlapsItem
+        @getCheckGotoFromItem
         @getGeneratePortsItem
         @getUpdateBlockNamesItem
     };
@@ -162,6 +164,21 @@ function schema = getHighlightItem(~)
     schema.tag = 'SimuTidyHighlight';
     schema.label = '高亮未连接端口';
     schema.callback = @(~) slHighlightUnconnected();
+end
+
+% 3.4.0 新增：诊断类菜单项（重叠检测 / Goto/From 配对诊断）
+function schema = getCheckOverlapsItem(~)
+    schema = sl_action_schema;
+    schema.tag = 'SimuTidyCheckOverlaps';
+    schema.label = '重叠检测';
+    schema.callback = @(~) slCheckOverlaps();
+end
+
+function schema = getCheckGotoFromItem(~)
+    schema = sl_action_schema;
+    schema.tag = 'SimuTidyCheckGotoFrom';
+    schema.label = 'Goto/From 配对诊断';
+    schema.callback = @(~) slCheckGotoFrom();
 end
 
 function schema = getGeneratePortsItem(~)

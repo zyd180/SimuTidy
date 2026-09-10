@@ -24,6 +24,8 @@
   - [6.8 生成接口](#68-生成接口)
   - [6.9 更新模块名称](#69-更新模块名称)
   - [6.10 信号对象解析](#610-信号对象解析)
+  - [6.11 模块重叠检测](#611-模块重叠检测)
+  - [6.12 Goto/From 配对诊断](#612-gotofrom-配对诊断)
 - [7. Simulink 工具栏](#7-simulink-工具栏)
 - [8. 命令行参考](#8-命令行参考)
 - [9. 配置文件详解](#9-配置文件详解)
@@ -158,7 +160,10 @@ GUI 主窗口与 Simulink 模型窗口相互独立，可以同时摆放，选中
 ├─ 接口与命名 ────────────────────────────────────────┤
 │ [生成接口              ] [更新模块名称            ]  │
 ├─ 检查与诊断 ────────────────────────────────────────┤
-│ [高亮未连接端口                                    ] │
+│ [高亮未连接] [重叠检测] [Goto/From 配对诊断]        │
+├─ 运行日志（3.4.0 新增，只读）──────────────────────┤
+│ [INFO] 左对齐 完成，基准模块: GainA…（最新在顶）    │
+│ …                                                   │
 ├────────────────────────────────────────────────────┤
 │                       就绪                           │
 └────────────────────────────────────────────────────┘
@@ -181,6 +186,7 @@ GUI 主窗口与 Simulink 模型窗口相互独立，可以同时摆放，选中
 - **新手引导**：首次启动自动弹出 3 步功能导览；标题栏右侧"使用引导"按钮可随时重新查看；"不再自动显示"后可随时手动重开
 - **页脚开发者信息**：窗口底部显示开发者与联系方式（Henry | 1378099981@qq.com | github.com/zyd180）
 - **状态栏**：显示操作进行中/完成/错误信息。绿色 = 成功，红色 = 出错（错误信息会附上 MATLAB 异常消息）。出错不会影响模型已保存内容，可用 Ctrl+Z 在 Simulink 中撤销
+- **运行日志区**（3.4.0 新增）：只读文本区，自动记录每次操作的完整明细（对齐基准、跳过原因、诊断发现等，带 `[INFO]/[WARN]` 前缀，**最新一条在最上面**），上限 200 行；不用再切 MATLAB 命令行就能回看操作历史
 - **单例窗口**：重复执行 `SimuTidy` 不会开多个窗口，只会把已开的窗口置前
 
 **通用操作流程**：在 Simulink 模型中框选/按住 Shift 选中目标对象 → 切到 SimuTidy 窗口点对应按钮 → 查看状态栏结果与 MATLAB 命令行输出。
@@ -227,6 +233,7 @@ zipFile = slExportWebView('my_model', 'D:\out');         % 指定输出目录（
 - 模块垂直平移后，其端口与对端端口同高，对齐依据线变成一条纯水平直线
 - 同一模块的其余连线在模块一侧拉直（以移动后的端口高度为准），远端不动
 - 对齐依据线：优先取用户同时选中的连线，否则取模块第一条已连接的连线
+- **只处理当前打开层级的选中模块/连线**：子层窗口中的选中对象不参与计算（3.4.0 修正，避免跨坐标系混算）
 - 移动前做碰撞检查：垂直平移会与周围模块重叠时，**该模块被跳过**（不做任何修改）
 - 汇总输出"对齐 X 个模块，跳过 Y 个"及跳过原因
 
@@ -254,7 +261,10 @@ slAlignLinePorts('my_model/Subsys')   % 指定子系统
 1. 选中 **至少 2 个**模块
 2. 点击对应按钮
 
-**8 种方式**（基准模块 = 选中范围内最上方、最左边的模块，**基准模块位置始终不动**，只有其余模块向它看齐）：
+**8 种方式**：
+
+- **6 种对齐**：基准模块 = 选中范围内最上方、最左边的模块，**基准模块位置始终不动**，只有其余模块向它看齐（命令行日志会明示基准块的名字）
+- **2 种等间距**：锚点是**中心最小 / 中心最大**的两个块（首尾不动），其余块（含基准块）按中心等差分布
 
 | 按钮 | 效果 |
 |------|------|
@@ -264,12 +274,13 @@ slAlignLinePorts('my_model/Subsys')   % 指定子系统
 | 底部对齐 | 所有模块底边对齐基准模块底边 |
 | 水平居中 | 所有模块的水平中心线对齐基准模块中心线 |
 | 垂直居中 | 所有模块的垂直中心线对齐基准模块中心线 |
-| 水平等间距 | 按各模块水平中心排序，在首尾模块中心之间等间距分布 |
-| 垂直等间距 | 按各模块垂直中心排序，在首尾模块中心之间等间距分布 |
+| 水平等间距 | 按各模块水平中心排序，在中心最小/最大的两块之间等间距分布 |
+| 垂直等间距 | 按各模块垂直中心排序，在中心最小/最大的两块之间等间距分布 |
 
 **说明**：
 - 对齐只改 x 或只改 y，另一维不动，因此不会破坏你已排好的行/列
-- 等间距分布会保留首尾两个模块的位置（其中基准模块若在首尾则不动）
+- **只处理当前打开层级的选中模块**：父层与子系统窗口同时有选中时，子层选中不参与计算（避免不同坐标系混算，3.4.0 修正）
+- 等间距的目标位置会被 Simulink 吸附到 5px 网格，步长非 5 的倍数时是近似等距
 - 选中的模块不足 2 个时报错提示
 
 **命令行**：
@@ -287,7 +298,7 @@ slAlignBlocks('my_model/Subsys', 'hspace');
 1. 选中至少 2 个模块
 2. 点击"大小统一"
 
-**目标尺寸规则**（GUI 按钮默认为 `base`）：
+**目标尺寸规则**（GUI 按钮默认为 `base`，基准 = 所选块中最上最左的那个，命令行日志会明示其名字）：
 
 | 模式 | 目标宽高 |
 |------|----------|
@@ -321,7 +332,8 @@ slUniformSize([], 'avg');
 | 按源模块名命名 | 信号源模块的名称 | 常规信号，一条源出一个名 |
 | 按源模块名+端口号命名 | `源名_outN`（N 为源模块输出端口号） | 一个模块输出多条信号需区分时 |
 | 按输出端口 (Outport) 命名 | 目标 Outport 块的名称（目标不是 Outport 时回退为源模块名） | 接口连线，信号名 = 对外接口名 |
-| 清除所有信号线命名 | 清空信号名 | 重来或清理 |
+| 清除所选信号线命名（3.4.0 新增） | 只清空**选中**的信号线名；未选中任何线时不做任何处理，仅 WARN 提醒 | 只想清掉个别线的名字 |
+| 清除所有信号线命名 | 弹窗二次确认后清空**当前层级全部**信号线名（无视选中状态，3.4.0 起默认确认） | 整层重来或清理 |
 
 **说明**：
 - 命名后自动打开线的 ShowName 显示
@@ -334,7 +346,9 @@ slUniformSize([], 'avg');
 slAutoNameSignals([], 'source');        % 按源模块名
 slAutoNameSignals([], 'source_port');   % 按源模块名+端口号
 slAutoNameSignals([], 'outport');       % 按输出端口
-slAutoNameSignals([], 'clear');         % 清除命名
+slAutoNameSignals([], 'clear');         % 清除命名（选中线优先，未选则全线）
+slClearSignalNames();                   % 清除选中的信号线名（零选中只提醒）
+slAutoNameSignals([], 'clear_all');     % 清除当前层级全部信号线名
 ```
 
 ### 6.6 拆分 Goto/From（批量）
@@ -401,6 +415,10 @@ slSplitGotoFrom('my_model/Subsys');% 指定子系统
 - 有任何未连接端口（输入/输出/使能/触发/状态等所有端口类型）的模块
 - 没有源端口的悬空线、没有目标端口的悬空线
 
+**结果反馈（3.4.0 起）**：
+- 有发现项时弹出结果面板，逐条给出**分类原因**（如"1 个输入端口未连接""悬空信号线"）和**定位**按钮（打开所在系统并高亮该对象）
+- 命令行接输出可得同一结构：`res = slHighlightUnconnected();`
+
 **命令行**：
 
 ```matlab
@@ -421,10 +439,10 @@ slHighlightUnconnected([], true);  % 清除全部高亮
   - **输入端口** → 在 Subsystem 左侧 220px 处新建 Inport 块，连线到该端口
   - **输出端口** → 在 Subsystem 右侧 50px 处新建 Outport 块，从该端口连线过来
 - 新块垂直位置与对应端口对齐
-- 颜色：Inport 浅蓝色（lightBlue）、Outport 粉色 [1, 0.333, 1]，图标内显示信号名
-- 块名固定为 `InportN` / `OutportN`（N 从子系统内已有同名块数量续起）
-- 新块垂直位置与对应端口对齐
-- 完成后自动 update 模型
+- 颜色：Inport 浅蓝色（lightBlue）、Outport 粉色 [1, 0.333, 1]
+- **块名（3.4.0 起）**：优先取子系统**内部对应端口块**的名称（内部叫 `Vin`，父层生成块也叫 `Vin`）；父层重名时追加 `_1`/`_2` 序号；内部块缺失时回落 `InportN`/`OutportN`
+- 显示：名称默认显示（ShowName on + 图标显示端口号，与"更新模块名称"一致）
+- 完成后自动 update 模型刷新端口显示（可在设置中关闭"操作后自动更新模型"跳过编译提速；关闭后下次更新图/仿真时自然生效）
 
 **说明**：
 - 每个悬空端口生成一个块；已连接的端口不动
@@ -494,6 +512,52 @@ slSetSignalResolve([], 'off');      % 整体取消勾选
 slSetSignalResolve('my_model/SubX', 'on');
 ```
 
+### 6.11 模块重叠检测
+
+**作用**：检查当前层级中位置互相重叠的模块（AABB 碰撞框），用于排查复制粘贴/拖拽造成的压叠。
+
+**使用步骤**：
+1. 打开目标层级（检查当前层全部模块，与选中状态无关）
+2. 点击"重叠检测"
+
+**结果**：
+- 有重叠时弹出结果面板，每处重叠一条（原因写明搭档块名），点"定位"打开所在系统并高亮
+- 无重叠时仅命令行提示，不弹面板
+
+**命令行**：
+
+```matlab
+res = slCheckOverlaps();            % 当前子系统；res.failItems 含可定位句柄
+res = slCheckOverlaps('my_model/SubX');
+```
+
+### 6.12 Goto/From 配对诊断
+
+**作用**：检查 Goto/From 标签配对问题。错配的 Tag 通常到仿真时才报错，本功能提前暴露。
+
+**使用步骤**：
+1. 打开目标层级
+2. 点击"Goto/From 配对诊断"
+
+**检查项**：
+
+| 问题 | 说明 |
+|------|------|
+| 悬空 Goto | 当前层的 Goto 在全模型范围内没有任何 From 引用 |
+| 无源 From | 当前层的 From 在全模型范围内找不到对应 Goto |
+| 跨层 local 引用 | From 引用了其他子系统里 `TagVisibility='local'` 的 Goto——local 仅本层可见，仿真会报错 |
+
+**结果**：同重叠检测，发现项在结果面板逐条定位。
+
+**已知边界**：不做编译校验（同 Tag 多 Goto 等复杂语义交给 Simulink 仿真诊断），只覆盖上述三类确定性问题。
+
+**命令行**：
+
+```matlab
+res = slCheckGotoFrom();            % 当前子系统
+res = slCheckGotoFrom('my_model/SubX');
+```
+
 ---
 
 ## 7. Simulink 工具栏
@@ -549,10 +613,13 @@ Tools
 | `slAlignLinePorts` | `slAlignLinePorts(sys)` | 连线端口对齐：垂直移动选中模块与另一端端口对齐 |
 | `slAlignBlocks` | `slAlignBlocks(sys, type)` | 对齐，type: left/right/top/bottom/hcenter/vcenter/hspace/vspace |
 | `slUniformSize` | `slUniformSize(sys, mode)` | 大小统一，mode: base/max/min/avg |
-| `slAutoNameSignals` | `slAutoNameSignals(sys, mode)` | 信号命名，mode: source/source_port/outport/clear |
+| `slAutoNameSignals` | `slAutoNameSignals(sys, mode)` | 信号命名，mode: source/source_port/outport/clear/clear_sel/clear_all |
+| `slClearSignalNames` | `slClearSignalNames(sys)` | 清除**选中**信号线命名（未选中仅提醒，不清全线） |
 | `slSplitGotoFrom` | `slSplitGotoFrom(sys)` | 批量拆分选中线为 Goto/From |
 | `slHighlightUnconnected` | `slHighlightUnconnected(sys, clearFlag)` | 高亮未连接端口 |
 | `slSetSignalResolve` | `slSetSignalResolve(sys, mode)` | 信号对象解析批量勾选，mode: on/off |
+| `slCheckOverlaps` | `res = slCheckOverlaps(sys)` | 当前层模块重叠检测（res 可定位） |
+| `slCheckGotoFrom` | `res = slCheckGotoFrom(sys)` | Goto/From 配对诊断（res 可定位） |
 | `slGeneratePorts` | `slGeneratePorts(sys)` | 为 Subsystem 生成接口 |
 | `slUpdateBlockNames` | `slUpdateBlockNames(sys)` | 批量更新 Inport/Outport 名称 |
 | `SimuTidy_install` | `SimuTidy_install()` | 永久安装到 Simulink 菜单 |
@@ -630,7 +697,7 @@ cfg.colors.error      = [0.780 0.290 0.259];  % 状态-出错
 ...
 
 %% Simulink API 配置
-cfg.simulink.updateAfterChange = true;  % 对齐/大小统一/拉线后是否自动 update 模型
+cfg.simulink.updateAfterChange = true;  % 改完后是否自动 update 模型（信号对象解析、生成接口）
 ```
 
 常用自定义场景：
@@ -638,7 +705,7 @@ cfg.simulink.updateAfterChange = true;  % 对齐/大小统一/拉线后是否自
 - **改 Goto/From 宽度**：修改 `cfg.goto.defaultWidth`（例如窄间距模型可改为 40）
 - **改间距**：修改 `cfg.goto.gap`（推荐 20~60）
 - **Tag 全局可见**：`cfg.goto.tagVisibility = 'global'`（需注意跨子系统 Tag 冲突）
-- **关闭自动 update**：`cfg.simulink.updateAfterChange = false`（大型模型 update 很慢时可关掉，最后手动 Ctrl+D）
+- **关闭自动 update**：`cfg.simulink.updateAfterChange = false`（大型模型 update 很慢时可关掉，最后手动 Ctrl+D；影响"信号对象解析"的即时校验与"生成接口"的即时端口刷新）
 
 ---
 
@@ -731,7 +798,7 @@ SimuTidy_check
 3. **跨层连线**不能直接拆分为 Goto/From
 4. **推块可能破坏严格列对齐**：碰撞感知推块保证"不重叠"，但不保证推开后仍与相邻模块对齐；对列对齐要求严格的图，建议手动微调后再拆
 5. **Goto/From 宽度固定 60**：不随名字长度变化；名字特别长的信号建议接受默认宽度，或自行调大 `cfg.goto.defaultWidth`
-6. **生成接口的块名固定为 InportN/OutportN**：如需按信号名命名，生成后运行"更新模块名称"
+6. **生成接口块名默认取内部接口名**：优先用子系统内部对应端口块的名称（父层重名自动加 `_N` 后缀，内部块缺失时回落 `InportN`/`OutportN`）；如需统一按信号名命名，生成后运行"更新模块名称"
 7. 大型模型上"更新模块名称"会遍历全部层级块，首次运行可能需要数十秒
 8. SimuTidy 的所有操作只作用于**当前子系统层**（slUpdateBlockNames 和 slExportWebView 例外，作用于整个模型）
 9. 在 Simulink 模型处于仿真运行/调试状态时请勿使用本工具，先停止仿真

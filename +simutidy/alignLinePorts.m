@@ -26,8 +26,13 @@ function res = alignLinePorts(sys, varargin)
     % 3.3.0 进度条：'Progress' 选项（仅 GUI 传窗口句柄时弹，见 internal/progress）
     opt = simutidy.internal.parseOptions(varargin, {'Progress'});
 
-    selBlocks = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'block');
-    selLines = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'line');
+    % 3.4.0 跨层修正：选中块/线均加 SearchDepth=1 只取当前层。原不限层的
+    % FindAll 会把打开的子系统里的选中对象混进来——块位置分属不同坐标系，
+    % 混算产生非预期移动（同 alignBlocks 3.4.0 修正，实测复现）
+    selBlocks = find_system(sysPath, 'FindAll', 'on', 'SearchDepth', 1, ...
+        'Selected', 'on', 'Type', 'block');
+    selLines = find_system(sysPath, 'FindAll', 'on', 'SearchDepth', 1, ...
+        'Selected', 'on', 'Type', 'line');
     if isempty(selBlocks)
         error('SimuTidy:noSelection', '请先选中要对齐的模块。');
     end

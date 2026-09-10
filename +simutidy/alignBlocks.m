@@ -10,8 +10,20 @@ function alignBlocks(sys, alignType)
 %           'left'/'right'/'top'/'bottom'/'hcenter'/'vcenter'/
 %           'hspace'/'vspace'（默认 'left'）
 %
-%   功能：以最上方最左的模块为基准，调整其他模块位置实现对齐；
-%         基准模块位置不变。
+%   功能：
+%       对齐 6 模式（left/right/top/bottom/hcenter/vcenter）：
+%           以"最上最左"的选中块为基准（其余 7 种提示文案均明确此规则），
+%           调整其他块实现对齐；基准块位置不变。
+%       等间距 2 模式（hspace/vspace，3.4.0 修正语义）：
+%           锚点是"中心最小"和"中心最大"的两个块，其余块（含基准块）
+%           按中心等差分布。修正前错误地跳过了基准块——基准在中间时
+%           等距被破坏、基准是唯一中间块时整体空转（实测 4 块间距
+%           250/185/215）；因此本模式不适用"基准不动"承诺，日志也
+%           相应改报实际调整数（原虚报 n-1）。
+%       作用范围（3.4.0 修正）：只处理当前层的选中块（SearchDepth=1）。
+%           修正前不限层，父层与打开的子系统窗口的选中块被混入同一
+%           坐标系一起计算，产生非预期大位移（与 highlightUnconnected
+%           3.1.0 的限层修正同一理由）
 %   兼容：根目录 slAlignBlocks.m 为薄包装，行为契约不变
 
     % nargin 守卫必须在把 sys 传入 resolveSystem **之前**：
@@ -28,7 +40,11 @@ function alignBlocks(sys, alignType)
         alignType = 'left';
     end
 
-    selectedObjs = find_system(sysPath, 'FindAll', 'on', 'Selected', 'on', 'Type', 'block');
+    % 3.4.0 跨层修正：加 SearchDepth=1 只取当前层选中块。原不限层的
+    % FindAll 会把打开的子系统里的选中块混进来——不同层坐标系不同，
+    % 混算必然产生非预期移动（实测复现，详见文件头"作用范围"）
+    selectedObjs = find_system(sysPath, 'FindAll', 'on', 'SearchDepth', 1, ...
+        'Selected', 'on', 'Type', 'block');
     if length(selectedObjs) < 2
         error('SimuTidy:tooFewBlocks', '请至少选中 2 个模块。');
     end
@@ -106,8 +122,10 @@ function alignBlocks(sys, alignType)
             if n > 1
                 step = (maxX - minX) / (n - 1);
                 for i = 1:n
+                    % 3.4.0 修正：删除原"if j == baseIdx, continue"跳过——
+                    % 等间距的锚点是中心首尾两块，基准块作为中间块必须参与
+                    % 分布，否则等距被破坏（实测复现，详见文件头）
                     j = idx(i);
-                    if j == baseIdx, continue; end
                     target = minX + (i - 1) * step;
                     newPosMap(j, :) = [target - widths(j) / 2, tops(j), ...
                                        target + widths(j) / 2, bottoms(j)];
@@ -121,8 +139,8 @@ function alignBlocks(sys, alignType)
             if n > 1
                 step = (maxY - minY) / (n - 1);
                 for i = 1:n
+                    % 3.4.0 修正：同 hspace，基准块不再跳过
                     j = idx(i);
-                    if j == baseIdx, continue; end
                     target = minY + (i - 1) * step;
                     newPosMap(j, :) = [lefts(j), target - heights(j) / 2, ...
                                        rights(j), target + heights(j) / 2];
@@ -135,16 +153,28 @@ function alignBlocks(sys, alignType)
     % 3.1.0 性能优化：目标位置与现位置相同的块跳过写入（幂等，重复操作
     % 场景直接省掉）。带连线的块每次 set_param(Position) 都会触发 Simulink
     % 内部连线重排（实测 ~1.1ms/块），能省则省
+    % 3.4.0：顺带统计实际调整数——等间距模式修正后基准块可能被移动，
+    % 日志不再适用"基准未动"话术，统一改报真实调整数（原虚报 n-1）
+    adjusted = 0;
     for i = 1:n
         if isequal(newPosMap(i, :), positions(i, :))
             continue;
         end
         set_param(selectedObjs(i), 'Position', newPosMap(i, :));
+        adjusted = adjusted + 1;
     end
 
     % 3.3.0：汇总输出接入分级日志（原 fprintf，正文不变加 [INFO] 前缀）
-    simutidy.internal.log('info', '%s 完成，基准模块: %s（位置未动），共调整 %d 个模块。', ...
-        getAlignText(alignType), get_param(selectedObjs(baseIdx), 'Name'), n-1);
+    % 3.4.0 分两条话术并明示基准是谁（用户反馈：容易搞不清哪个是基准）：
+    %   对齐 6 模式 → 基准=最上最左块，报出其名字且注明未动
+    %   等间距 2 模式 → 锚点=中心最小/最大的两块，基准概念不适用
+    if any(strcmp(alignType, {'hspace', 'vspace'}))
+        simutidy.internal.log('info', '%s 完成：锚点为中心最小/最大的两个块，实际调整 %d 个模块。', ...
+            getAlignText(alignType), adjusted);
+    else
+        simutidy.internal.log('info', '%s 完成，基准模块: %s（所选块中最上最左，位置未动），实际调整 %d 个模块。', ...
+            getAlignText(alignType), get_param(selectedObjs(baseIdx), 'Name'), adjusted);
+    end
 
     % 3.1.0 性能优化：移除操作后的 SimulationCommand update。
     % 原因：update 触发整模型编译（500 块实测 ~0.16s，大模型为秒级），而

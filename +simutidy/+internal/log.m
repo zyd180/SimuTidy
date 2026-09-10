@@ -6,7 +6,9 @@ function log(level, fmt, varargin)
 %
 %   输出：
 %   - 命令行：格式化文案加 [LEVEL] 前缀（INFO/WARN/ERROR/DEBUG）
-%   - GUI 状态栏：仅 warn/error 转发到注册的 sink（见 setLogSink 说明）
+%   - GUI sink：3.4.0 起转发 **info 及以上**（原只转 warn/error）——GUI
+%     日志区需要 info 级的操作明细（对齐基准/跳过原因等），展示与否由
+%     sink 自行决定；见 setLogSink 说明
 %
 %   设计取舍（刻意从薄，别往厚里加）：
 %   - 不落盘、不做多 sink、不做等级切换 UI——工具规模用不上；
@@ -33,8 +35,8 @@ function log(level, fmt, varargin)
         fprintf('[%s] %s\n', upper(level), msg);
     end
 
-    % GUI 状态栏 sink：只收 warn/error
-    if lv >= 3
+    % GUI sink：info 及以上全部转发（3.4.0，原仅 warn/error）
+    if lv >= 2
         sink = getappdata(0, 'SimuTidy_LogSink');
         if ~isempty(sink)
             try

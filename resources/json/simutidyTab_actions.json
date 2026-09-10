@@ -15,6 +15,18 @@
         },
         {
             "type": "Action",
+            "id": "exportAction",
+            "text": "导出\nWeb 视图",
+            "description": "将当前模型导出为 HTML Web 视图 ZIP 包（需要 Simulink Report Generator 许可证）",
+            "icon": {
+                "icon16": "export_16.png",
+                "icon24": "export_24.png"
+            },
+            "command": "slExportWebView()",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
             "id": "alignPopupAction",
             "text": "模块\n对齐",
             "description": "选择模块对齐与等间距分布方式（基准模块不动）",
@@ -215,6 +227,30 @@
                 "icon24": "highlight_24.png"
             },
             "command": "slHighlightUnconnected()",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "checkOverlapsAction",
+            "text": "重叠\n检测",
+            "description": "检查当前层级两两重叠的模块，发现项在结果面板逐条定位",
+            "icon": {
+                "icon16": "checkoverlap_16.png",
+                "icon24": "checkoverlap_24.png"
+            },
+            "command": "slCheckOverlaps()",
+            "commandType": "Script"
+        },
+        {
+            "type": "Action",
+            "id": "checkGotoFromAction",
+            "text": "Goto/From\n配对诊断",
+            "description": "检查悬空 Goto、无源 From、跨层 local 标签引用",
+            "icon": {
+                "icon16": "checkgoto_16.png",
+                "icon24": "checkgoto_24.png"
+            },
+            "command": "slCheckGotoFrom()",
             "commandType": "Script"
         }
     ]

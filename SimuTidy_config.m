@@ -7,8 +7,8 @@ function cfg = SimuTidy_config()
     persistent warnedBad   % 用户配置解析失败的"只告警一次"标志（函数顶部声明）
 
     %% 版本信息
-    cfg.version = '3.3.1';
-    cfg.versionDate = '2026-09-09';
+    cfg.version = '3.4.0';
+    cfg.versionDate = '2026-09-10';
     
     %% Goto/From模块配置
     cfg.goto.defaultWidth = 60;
@@ -24,10 +24,14 @@ function cfg = SimuTidy_config()
     %% GUI配置
     % 3.3.1：默认高度 620→700——gridlayout 各固定行高合计需要 ~660px，
     % 620 会裁掉底部"检查与诊断"分区
-    cfg.gui.mainPosition = [500, 60, 460, 700];
+    % 3.4.0：700→800——新增"运行日志"区（96px 行），行高合计 ~760px，
+    % 800 留余量；y 抬到 30 防小屏超出
+    cfg.gui.mainPosition = [500, 30, 460, 800];
     % 3.1.0 清理：原 cfg.gui.alignDialogPos 已随死代码 SimuTidy_alignDialog
     % 一并删除（该对话框无任何调用方，主窗口自带对齐按钮组）
-    cfg.gui.nameDialogPos = [520, 360, 320, 300];
+    cfg.gui.nameDialogPos = [520, 360, 320, 350];
+    % 3.4.0：对话框高度 300→350——新增"清除所选信号线命名"按钮，纵向
+    % 各按钮重新排布需 50px 余量（按钮坐标见 SimuTidy_nameDialog）
     % 3.2.0：bgColor 移入主题调色板（见下方"主题配置"），此处不再直接定义；
     % gui 代码继续读 cfg.gui.bgColor（字段路径兼容 2.6.1 以来写法）
     cfg.gui.refreshInterval = 1;  % 模型标签刷新间隔（秒）

@@ -23,6 +23,21 @@
                 },
                 {
                     "type": "Section",
+                    "title": "视图与导出",
+                    "children": [
+                        {
+                            "type": "Column",
+                            "children": [
+                                {
+                                    "type": "PushButton",
+                                    "action": "exportAction"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": "Section",
                     "title": "模块整理",
                     "children": [
                         {
@@ -90,7 +105,7 @@
                 },
                 {
                     "type": "Section",
-                    "title": "接口与诊断",
+                    "title": "接口与命名",
                     "children": [
                         {
                             "type": "Column",
@@ -109,13 +124,37 @@
                                     "action": "updNameAction"
                                 }
                             ]
-                        },
+                        }
+                    ]
+                },
+                {
+                    "type": "Section",
+                    "title": "检查与诊断",
+                    "children": [
                         {
                             "type": "Column",
                             "children": [
                                 {
                                     "type": "PushButton",
                                     "action": "highlightAction"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "Column",
+                            "children": [
+                                {
+                                    "type": "PushButton",
+                                    "action": "checkOverlapsAction"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "Column",
+                            "children": [
+                                {
+                                    "type": "PushButton",
+                                    "action": "checkGotoFromAction"
                                 }
                             ]
                         }

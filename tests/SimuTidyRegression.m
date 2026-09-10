@@ -143,6 +143,50 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
             f = @() slAlignBlocks(tc.ModelName, 'left'); % 0 选中 → 报错
             tc.assertThrows(f);
         end
+
+        function testHspaceMovesBaseForEvenSpacing(tc)
+            % 3.4.0 修复锁定：等间距不再跳过基准块——基准在中间时必须
+            % 参与分布，否则等距被破坏（修复前实测 250/185/215）。
+            % 注意：Simulink 会把块位置吸附到 5px 网格，步长必须取网格
+            % 整数倍才能精确断言（首例 650/3 就踩过，间距变 215/220/215）
+            mdl = tc.ModelName;
+            add_block('built-in/Gain', [mdl '/L'],    'Position', [50  200 90  240]); % 中心 70 端点
+            add_block('built-in/Gain', [mdl '/Base'], 'Position', [300 50  340 90]);  % 中心 320，最上=基准
+            add_block('built-in/Gain', [mdl '/M2'],   'Position', [500 200 540 240]); % 中心 520 中间
+            add_block('built-in/Gain', [mdl '/R'],    'Position', [650 300 690 340]); % 中心 670 端点（步长 200，5 的倍数）
+            tc.selectBlocks({'L'; 'Base'; 'M2'; 'R'});
+            slAlignBlocks(mdl, 'hspace');
+            cx = zeros(1, 4);
+            names = {'L', 'Base', 'M2', 'R'};
+            for k = 1:4
+                p = get_param([mdl '/' names{k}], 'Position');
+                cx(k) = mean(p([1 3]));
+            end
+            tc.verifyEqual((cx(2) - cx(1)), (cx(3) - cx(2)), '前段间距不等', 'AbsTol', 1e-6);
+            tc.verifyEqual((cx(3) - cx(2)), (cx(4) - cx(3)), '后段间距不等', 'AbsTol', 1e-6);
+        end
+
+        function testAlignAndSizeIgnoreCrossLayerSelection(tc)
+            % 3.4.0 修复锁定：只处理当前层（SearchDepth=1），子层选中块
+            % 不被混入父层坐标系计算（修复前会一起移动/改尺寸）
+            mdl = tc.ModelName;
+            add_block('built-in/Gain', [mdl '/Top1'], 'Position', [100 100 140 140]);
+            add_block('built-in/Gain', [mdl '/Top2'], 'Position', [300 200 340 240]);
+            add_block('built-in/SubSystem', [mdl '/SUB'], 'Position', [200 400 260 460]);
+            add_block('built-in/Gain', [mdl '/SUB/Inner'], 'Position', [30 30 100 100]);
+            tc.selectBlocks({'Top1'; 'Top2'; 'SUB/Inner'});
+            innerPos = get_param([mdl '/SUB/Inner'], 'Position');
+
+            slAlignBlocks(mdl, 'left');
+            tc.verifyEqual(get_param([mdl '/Top1'], 'Position'), [100 100 140 140], '基准被移动');
+            tc.verifyEqual(get_param([mdl '/Top2'], 'Position'), [100 200 140 240], '顶层对齐未生效');
+            tc.verifyEqual(get_param([mdl '/SUB/Inner'], 'Position'), innerPos, ...
+                '子层块不应被父层对齐操作改动');
+
+            slUniformSize(mdl, 'base');
+            tc.verifyEqual(get_param([mdl '/SUB/Inner'], 'Position'), innerPos, ...
+                '子层块不应被父层大小统一改动');
+        end
     end
 
     %% ====================================================================
@@ -212,6 +256,44 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
 
             slAutoNameSignals(mdl, 'clear');
             tc.verifyEqual(get_param(lh, 'Name'), '');
+        end
+
+        function testClearSelectedAndAllModes(tc)
+            % 3.4.0 新增清除类模式锁定：
+            %   clear_sel 只清选中的线，没选中时不做处理仅提醒（不报错）
+            %   clear_all 无视选中状态清当前层全部线
+            mdl = tc.ModelName;
+            % 串联两条线：A→B→C，各命名 sig1/sig2
+            add_block('built-in/Gain', [mdl '/A'], 'Position', [50 50 90 90]);
+            add_block('built-in/Gain', [mdl '/B'], 'Position', [200 50 240 90]);
+            add_block('built-in/Gain', [mdl '/C'], 'Position', [350 50 390 90]);
+            add_line(mdl, 'A/1', 'B/1', 'autorouting', 'on');
+            add_line(mdl, 'B/1', 'C/1', 'autorouting', 'on');
+            lh = find_system(mdl, 'FindAll', 'on', 'Type', 'line');
+            set_param(lh(1), 'Name', 'sig1');
+            set_param(lh(2), 'Name', 'sig2');
+
+            % 场景1：只选第一条线 → 只清它，另一条保留
+            set_param(lh(1), 'Selected', 'on');
+            simutidy.autoNameSignals(mdl, 'clear_sel');
+            tc.verifyEqual(get_param(lh(1), 'Name'), '', '选中线未被清除');
+            tc.verifyEqual(get_param(lh(2), 'Name'), 'sig2', '未选中线不应被清除');
+
+            % 场景2：全部取消选中 → 不做处理不报错，名字原样保留
+            set_param(lh(1), 'Selected', 'off');
+            set_param(lh(2), 'Selected', 'off');
+            threw = false;
+            try
+                simutidy.autoNameSignals(mdl, 'clear_sel');
+            catch
+                threw = true;
+            end
+            tc.verifyFalse(threw, '零选中不应抛错（应只提醒）');
+            tc.verifyEqual(get_param(lh(2), 'Name'), 'sig2', '零选中不应有改动');
+
+            % 场景3：clear_all 无视选中状态清当前层全部
+            simutidy.autoNameSignals(mdl, 'clear_all');
+            tc.verifyEqual(get_param(lh(2), 'Name'), '', 'clear_all 未清全部线');
         end
 
         function testAutoNameOutportMode(tc)
@@ -312,6 +394,92 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
             slHighlightUnconnected(mdl);
             slHighlightUnconnected(mdl, true);
         end
+
+        function testHighlightResClassification(tc)
+            % 3.4.0 升级锁定：res 逐项分类 + 可定位句柄
+            mdl = tc.ModelName;
+            tc.addAndConnect([100 100 140 140], [300 200 340 240]); % A→B 完整
+            add_block('built-in/Gain', [mdl '/LonelyIn'], 'Position', [500 100 540 140]);  % 只缺输入
+            add_block('built-in/Outport', [mdl '/LonelyOut'], 'Position', [700 100 730 120]); % 只缺输出
+            % 多输入块（Logic 默认 2 输入全悬空）：锁定 get_param 多句柄
+            % 返回 cell 的归一路径（用户实测：cell 直接 == -1 抛 'eq' 未定义）
+            add_block('built-in/Logic', [mdl '/MultiIn'], ...
+                'Position', [900 100 940 140]);
+
+            res = simutidy.highlightUnconnected(mdl);
+            % 既有语义：任何有未连接端口的模块都算发现——A 输入悬空、
+            % B 输出悬空也算，加上两个孤立块与多输入块共 5 项
+            tc.verifyEqual(res.failCount, 5, '应发现 5 个问题模块');
+            % 5 块 + 1 线共 6 个对象：5 个块全有问题，唯一连接完好的是
+            % A→B 那条线 → okCount = 1
+            tc.verifyEqual(res.okCount, 1, 'okCount 应为连接完好的对象数');
+            reasons = {res.failItems.reason};
+            % 注意用 startsWith 而非 strncmp(n)：n 超过前缀长度时必然不等
+            tc.verifyTrue(any(startsWith(reasons, '2 个输入端口')), '应报 2 个输入端口未连接');
+            tc.verifyTrue(any(startsWith(reasons, '1 个输入端口')), '应报输入端口未连接');
+            tc.verifyTrue(any(startsWith(reasons, '1 个输出端口')), '应报输出端口未连接');
+            for k = 1:res.failCount
+                tc.verifyTrue(ishandle(res.failItems(k).handle), '发现项句柄应有效');
+            end
+            % 清除模式返回零发现 res
+            res2 = simutidy.highlightUnconnected(mdl, true);
+            tc.verifyEqual(res2.failCount, 0, '清除模式应返回零发现');
+        end
+
+        function testHighlightWithProgressOption(tc)
+            % 3.4.0 修复锁定：'Progress' 名值对路径（GUI 三参调用）不再
+            % 抛"clearFlag 无法识别"——clearFlag 默认值须先于条件分支
+            % 赋值（存量 bug：3.3.0 引入，回归只测过 1/2 参）
+            mdl = tc.ModelName;
+            tc.addAndConnect([100 100 140 140], [300 200 340 240]);
+            threw = false;
+            try
+                res = simutidy.highlightUnconnected(mdl, 'Progress', []);
+            catch
+                threw = true;
+            end
+            tc.verifyFalse(threw, 'Progress 选项路径不应报 clearFlag 未定义');
+            tc.verifyEqual(res.failCount, 2, 'Progress 路径检查结果应正确');
+            res2 = simutidy.highlightUnconnected(mdl, true, 'Progress', []);
+            tc.verifyEqual(res2.failCount, 0, 'clearFlag 与 Progress 共存应可用');
+        end
+
+        function testCheckOverlaps(tc)
+            % 3.4.0 新增：AABB 重叠对检测
+            mdl = tc.ModelName;
+            add_block('built-in/Gain', [mdl '/OA'], 'Position', [50 50 90 90]);
+            add_block('built-in/Gain', [mdl '/OB'], 'Position', [70 70 110 110]);  % 与 OA 重叠
+            add_block('built-in/Gain', [mdl '/OC'], 'Position', [300 300 340 340]); % 独立
+            res = simutidy.checkOverlaps(mdl);
+            tc.verifyEqual(res.failCount, 1, '应发现 1 处重叠');
+            tc.verifyEqual(get_param(res.failItems(1).handle, 'Name'), 'OA', '句柄应指向重叠对之一');
+            tc.verifySubstring(res.failItems(1).reason, 'OB', '原因应写明搭档块名');
+            tc.verifyEqual(res.okCount, 1, '仅 OC 无重叠');
+            tc.verifyEqual(res.op, '模块重叠检测');
+        end
+
+        function testCheckGotoFrom(tc)
+            % 3.4.0 新增：配对诊断四场景
+            mdl = tc.ModelName;
+            % T1：悬空 Goto（无 From）；T3/T3：正常配对；SUB/T4 local + 顶层 From：跨层 local
+            add_block('built-in/Goto', [mdl '/G_T1'], 'GotoTag', 'T1', 'Position', [50 50 90 70]);
+            add_block('built-in/Goto', [mdl '/G_T3'], 'GotoTag', 'T3', 'Position', [50 100 90 120]);
+            add_block('built-in/From', [mdl '/F_T3'], 'GotoTag', 'T3', 'Position', [150 100 190 120]);
+            add_block('built-in/From', [mdl '/F_T2'], 'GotoTag', 'T2', 'Position', [150 150 190 170]); % 无源 From
+            add_block('built-in/SubSystem', [mdl '/SUB'], 'Position', [300 50 360 110]);
+            add_block('built-in/Goto', [mdl '/SUB/G_T4'], 'GotoTag', 'T4', ...
+                'TagVisibility', 'local', 'Position', [30 30 70 50]);
+            add_block('built-in/From', [mdl '/F_T4'], 'GotoTag', 'T4', 'Position', [150 200 190 220]);
+
+            res = simutidy.checkGotoFrom(mdl);
+            tc.verifyEqual(res.failCount, 3, '应发现悬空 Goto/无源 From/跨层 local 三处');
+            reasons = {res.failItems.reason};
+            tc.verifyTrue(any(contains(reasons, 'T1')), '应报悬空 Goto T1');
+            tc.verifyTrue(any(contains(reasons, 'T2')), '应报无源 From T2');
+            tc.verifyTrue(any(contains(reasons, 'T4')), '应报跨层 local T4');
+            % 正常配对的 T3 不应出现在发现项中
+            tc.verifyFalse(any(contains(reasons, 'T3')), '正常配对 T3 不应被误报');
+        end
     end
 
     %% ====================================================================
@@ -320,24 +488,48 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
     methods (Test)
         function testGeneratePorts(tc)
             mdl = tc.ModelName;
-            % 子系统内含 Inport/Outport，但父层端口全部悬空
+            % 子系统内含 Inport/Outport，但父层端口全部悬空。
+            % 3.4.0 命名规则更新：父层新块名 = 内部对应端口块名
+            % （原规则锁定 Inport2/Outport2 跳号怪癖，已随命名规则更新废除）
             add_block('built-in/SubSystem', [mdl '/SUB'], 'Position', [300 100 360 160]);
-            add_block('built-in/Inport',  [mdl '/SUB/In1'],  'Position', [30 28 60 42]);
-            add_block('built-in/Outport', [mdl '/SUB/Out1'], 'Position', [270 28 300 42]);
+            add_block('built-in/Inport',  [mdl '/SUB/Vin'],  'Position', [30 28 60 42]);
+            add_block('built-in/Outport', [mdl '/SUB/Vout'], 'Position', [270 28 300 42]);
             add_block('built-in/Gain', [mdl '/SUB/G'], 'Position', [100 30 140 60]);
-            add_line([mdl '/SUB'], 'In1/1', 'G/1', 'autorouting', 'on');
-            add_line([mdl '/SUB'], 'G/1', 'Out1/1', 'autorouting', 'on');
+            add_line([mdl '/SUB'], 'Vin/1', 'G/1', 'autorouting', 'on');
+            add_line([mdl '/SUB'], 'G/1', 'Vout/1', 'autorouting', 'on');
 
             slGeneratePorts([mdl '/SUB']);
 
-            % 锁定既有编号怪癖：新块序号 = 子系统内同类型块数 + 端口号
-            % （子层已有 In1/Out1 各 1 个 → 生成 Inport2/Outport2 而非 Inport1）
-            tc.verifyTrue(getSimulinkBlockHandle([mdl '/Inport2']) ~= -1, ...
-                '未生成 Inport2');
-            tc.verifyTrue(getSimulinkBlockHandle([mdl '/Outport2']) ~= -1, ...
-                '未生成 Outport2');
+            % 新块直接沿用内部名 Vin/Vout（不再是 InportN/OutportN）
+            tc.verifyTrue(getSimulinkBlockHandle([mdl '/Vin']) ~= -1, '未生成 Vin');
+            tc.verifyTrue(getSimulinkBlockHandle([mdl '/Vout']) ~= -1, '未生成 Vout');
+            % 3.4.0 显示约定：默认显示模块名称（ShowName on + 图标显示端口号，
+            % 与 updateBlockNames 一致）
+            tc.verifyEqual(get_param([mdl '/Vin'], 'ShowName'), 'on', '模块名未显示');
+            tc.verifyEqual(get_param([mdl '/Vin'], 'IconDisplay'), 'Port number', ...
+                '图标应显示端口号');
             % FindAll 递归全层：SUB 内部 2 线 + 父层新增 2 线 = 4
             tc.verifyEqual(numel(find_system(mdl, 'FindAll', 'on', 'Type', 'line')), 4);
+        end
+
+        function testGeneratePortsConflictAndFallback(tc)
+            % 3.4.0 命名规则的两条兜底路径：
+            %   1) 冲突后缀：父层已存在同名块 → 新块追加 _1
+            %   2) 清洗：内部名含非法字符（空格/点）→ 按 sanitizeName 规则替换
+            mdl = tc.ModelName;
+            % 占名块：内部 Inport 也叫 'V in.1' → 清洗后 preferred='V_in_1'，
+            % 先放一个同名 Gain 占住 'V_in_1' → 期望生成 'V_in_1_1'
+            add_block('built-in/Gain', [mdl '/V_in_1'], 'Position', [500 100 540 140]);
+            add_block('built-in/SubSystem', [mdl '/SUB'], 'Position', [300 100 360 160]);
+            add_block('built-in/Inport', [mdl '/SUB/V in.1'], 'Position', [30 28 60 42]);
+            add_block('built-in/Gain', [mdl '/SUB/G'], 'Position', [100 30 140 60]);
+            add_line([mdl '/SUB'], 'V in.1/1', 'G/1', 'autorouting', 'on');
+
+            slGeneratePorts([mdl '/SUB']);
+            tc.verifyTrue(getSimulinkBlockHandle([mdl '/V_in_1_1']) ~= -1, ...
+                '清洗+冲突后缀路径未按预期生成 V_in_1_1');
+            % 内部块名缺省回落路径较难构造（删内部 Inport 会连带删端口），
+            % 逻辑上仅 preferred 为空时走 sprintf 兜底，此处不强行覆盖
         end
     end
 
@@ -483,20 +675,22 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
         end
 
         function testLogSink(tc)
-            % sink 只收 warn/error；info 不转发；清除后停止转发
+            % 3.4.0 变更锁定：sink 转发 **info 及以上**（原只转 warn/error，
+            % 为 GUI 日志区提供操作明细）；debug 仍不转发；清除后停止
             tc.sinkMsgs = {};
             simutidy.internal.setLogSink(@(msg, lv) tc.captureSink(msg, lv));
             cleaner = onCleanup(@() simutidy.internal.setLogSink([]));
 
             simutidy.internal.log('warn', 'tw%d', 1);
-            simutidy.internal.log('info', 'no-capture');
+            simutidy.internal.log('info', 'yes-capture');
             simutidy.internal.log('error', 'tw%d', 2);
-            tc.verifyEqual(numel(tc.sinkMsgs), 2, 'sink 应只收 warn/error');
-            tc.verifyEqual(tc.sinkMsgs{1}, 'warn|tw1', '等级/内容不符');
+            simutidy.internal.log('debug', 'no-capture');
+            tc.verifyEqual(numel(tc.sinkMsgs), 3, 'sink 应收 info/warn/error 共 3 条');
+            tc.verifyEqual(tc.sinkMsgs{2}, 'info|yes-capture', 'info 应转发');
 
             simutidy.internal.setLogSink([]);
             simutidy.internal.log('warn', 'after-clear');
-            tc.verifyEqual(numel(tc.sinkMsgs), 2, '清除后不应再转发');
+            tc.verifyEqual(numel(tc.sinkMsgs), 3, '清除后不应再转发');
         end
 
         function testResultFeedback(tc)

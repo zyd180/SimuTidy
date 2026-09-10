@@ -32,9 +32,14 @@ function SimuTidy_resultPanel(res)
     g.Padding = [10 10 10 10];
     g.RowSpacing = 4;
 
-    % 表头：操作名 + 失败数（okCount 一并给出，方便对照）
-    hdr = uilabel(g, 'Text', sprintf('%s：成功 %d / 失败 %d', ...
-        res.op, res.okCount, res.failCount), ...
+    % 表头：操作名 + 计数
+    % 3.4.0：诊断类检查（高亮未连接/重叠/GotoFrom 配对）语义上没有
+    % "失败"，经可选 res.okLabel/failLabel 提供文案（缺省回落
+    % 成功/失败，兼容既有批量操作 res 结构）
+    if isfield(res, 'okLabel'),   okLbl = res.okLabel;     else, okLbl = '成功';   end
+    if isfield(res, 'failLabel'), failLbl = res.failLabel; else, failLbl = '失败'; end
+    hdr = uilabel(g, 'Text', sprintf('%s：%s %d / %s %d', ...
+        res.op, okLbl, res.okCount, failLbl, res.failCount), ...
         'FontWeight', 'bold', 'FontColor', cfg.colors.error, ...
         'HorizontalAlignment', 'left');
     hdr.Layout.Row = 1;

@@ -51,6 +51,7 @@ function SimuTidy_makeIcons(variant)
     % 图标名 → 所属分区色
     map = { ...
         'openTidy',   'export'; ...
+        'export',     'export'; ...
         'align',     'module'; ...
         'align_l',   'module'; ...
         'align_r',   'module'; ...
@@ -67,7 +68,9 @@ function SimuTidy_makeIcons(variant)
         'genport',   'port'; ...
         'updname',   'portDark'; ...
         'highlight', 'check'; ...
-        'resolve',   'lineDark'};
+        'resolve',   'lineDark'; ...
+        'checkoverlap', 'check'; ...
+        'checkgoto',    'check'};
 
     n = 0;
     for k = 1:size(map, 1)
@@ -93,6 +96,13 @@ function c = drawIcon(name, s, col)
             % 窗口：外框 + 标题条
             c = outlineRect(c, 2, 3, 13, 13, col, 1);
             c = fillRect(c, 2, 3, 13, 5, col);
+
+        case 'export'
+            % 3.4.0 新增：向下箭头 + 底部托盘（导出语义）
+            c = fillRect(c, 7, 1, 9, 8, col);        % 箭杆
+            c = fillRect(c, 5, 6, 11, 8, col);       % 箭头
+            c = fillRect(c, 2, 10, 14, 11, col);     % 托盘
+            c = fillRect(c, 2, 12, 14, 13, col);     % 托盘厚度
 
         case 'align'
             % 下拉主图标：左侧基准竖线 + 3 条横条
@@ -211,6 +221,20 @@ function c = drawIcon(name, s, col)
             c = fillRect(c, 1, 8, 6, 9, col);
             c = drawDiag(c, 7.5, 9.5, 9.5, 12, col, 1.2);
             c = drawDiag(c, 9.5, 12, 14, 7, col, 1.2);
+
+        case 'checkoverlap'
+            % 3.4.0 新增：前后两个交叠方块（重叠检测语义）
+            % 前块实心、后块空心描边，交叠处被实心覆盖，一眼读出"压叠"
+            c = outlineRect(c, 1, 6, 10, 15, col, 1);
+            c = fillRect(c, 6, 1, 14, 9, col);
+
+        case 'checkgoto'
+            % 3.4.0 新增：左右两个标签块 + 中间右向箭头（Goto/From
+            % 配对诊断语义：标签对与配对关系）
+            c = fillRect(c, 0, 5, 5, 10, col);       % 左标签块（Goto）
+            c = fillRect(c, 5, 7, 10, 8, col);       % 箭杆
+            c = fillRect(c, 9, 5.5, 10, 9.5, col);   % 箭头
+            c = fillRect(c, 11, 5, 15, 10, col);     % 右标签块（From）
 
         otherwise
             error('未知图标: %s', name);

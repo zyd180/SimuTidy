@@ -34,7 +34,9 @@
     % 3.3.1 行高经验值：必须给足余量——uifigure 在高 DPI 下控件最小尺寸
     % 变大，行高压到最小值以下时按钮会被裁成细条（用户实测截图反馈：
     % 标题行 26px 裁字、"连线整理"第二行被挤扁）
-    g.RowHeight = {34, 20, 72, 162, 118, 72, 72, 20, 24};
+    % 3.4.0：新增第 8 行"运行日志"（110px：面板标题 ~24px + ~3 行文本），
+    % 总高相应抬升
+    g.RowHeight = {34, 20, 72, 162, 118, 72, 72, 110, 20, 24};
     g.RowSpacing = 6;
     g.ColumnSpacing = 8;
     g.Padding = [8, 8, 8, 8];
@@ -107,8 +109,8 @@
         '底部对齐', 'bottom',  '所有选中模块底边对齐到基准模块（最上最左）'
         '水平居中', 'hcenter', '所有选中模块水平中心线对齐到基准模块（最上最左）'
         '垂直居中', 'vcenter', '所有选中模块垂直中心线对齐到基准模块（最上最左）'
-        '水平等间距', 'hspace', '按水平中心将选中模块在首尾范围内等间距分布'
-        '垂直等间距', 'vspace', '按垂直中心将选中模块在首尾范围内等间距分布'};
+        '水平等间距', 'hspace', '按水平中心将选中模块等间距分布（锚点：中心最小/最大的两块，其余块含基准块参与移动）'
+        '垂直等间距', 'vspace', '按垂直中心将选中模块等间距分布（锚点：中心最小/最大的两块，其余块含基准块参与移动）'};
     for k = 1:size(alignDefs, 1)
         b = uibutton(pg2, 'push', 'Text', alignDefs{k, 1}, ...
             'FontSize', 11, 'BackgroundColor', cfg.colors.module, ...
@@ -196,24 +198,58 @@
     p5.Layout.Row = 7;
     pg5 = uigridlayout(p5);
     pg5.RowHeight = {34};
-    pg5.ColumnWidth = {'1x'};
+    % 3.4.0：诊断三功能并排一行（高亮/重叠/GotoFrom 配对），不增行高、
+    % 主窗口总高度不变
+    pg5.ColumnWidth = {'1x', '1x', '1x'};
     pg5.RowSpacing = 8;
     pg5.Padding = [6, 6, 6, 6];
 
     uibutton(pg5, 'push', 'Text', '高亮未连接端口', ...
         'FontSize', 11, 'BackgroundColor', cfg.colors.check, 'FontColor', [1 1 1], ...
-        'Tooltip', '高亮有未连接端口的模块及悬空信号线；再次运行刷新状态，已连接的自动取消高亮', ...
+        'Tooltip', '高亮有未连接端口的模块及悬空信号线；再次运行刷新状态，已连接的自动取消高亮；3.4.0 起失败项可在结果面板逐条定位', ...
         'ButtonPushedFcn', @(~,~) onHighlightUnconnected(fig));
 
-    % ===== 行8：状态标签 =====
+    % 3.4.0 新增：模块重叠检测
+    uibutton(pg5, 'push', 'Text', '重叠检测', ...
+        'FontSize', 11, 'BackgroundColor', cfg.colors.check, 'FontColor', [1 1 1], ...
+        'Tooltip', '检查当前层级两两重叠的模块（AABB），发现项在结果面板逐条定位', ...
+        'ButtonPushedFcn', @(~,~) onCheckOverlaps(fig));
+
+    % 3.4.0 新增：Goto/From 配对诊断
+    uibutton(pg5, 'push', 'Text', 'Goto/From 配对诊断', ...
+        'FontSize', 11, 'BackgroundColor', cfg.colors.check, 'FontColor', [1 1 1], ...
+        'Tooltip', '检查悬空 Goto（无 From 引用）、无源 From、跨层 local 标签引用（仿真会报错）；发现项在结果面板逐条定位', ...
+        'ButtonPushedFcn', @(~,~) onCheckGotoFrom(fig));
+
+    % ===== 行8：运行日志（3.4.0 新增）=====
+    % 只读追加区：显示每次操作的完整明细（对齐基准/跳过原因/诊断发现），
+    % 弥补状态栏"只看得到最后一条"的不足；命令行输出保持不变
+    % 3.4.0 追改：标题用 uipanel Title 固定在日志区上方（用户反馈：原标题
+    % 混在 textarea 首行，新增行插顶后会被推下去"下沉"且被选中态干扰；
+    % 面板标题与其他分区标题样式一致，恒定可见）
+    p6 = uipanel(g, 'Title', '  运行日志  ', ...
+        'BackgroundColor', cfg.gui.bgColor, ...
+        'ForegroundColor', cfg.colors.panelTitle, 'FontWeight', 'bold');
+    p6.Layout.Row = 8;
+    pg6 = uigridlayout(p6);
+    pg6.ColumnWidth = {'1x'};
+    pg6.RowHeight = {'1x'};  % 单行伸展占满面板
+    pg6.Padding = [2, 2, 2, 2];
+    logArea = uitextarea(pg6, ...
+        'Editable', 'off', ...
+        'FontName', 'Consolas', 'FontSize', 9, ...
+        'BackgroundColor', cfg.gui.bgColor, ...
+        'Value', '');
+
+    % ===== 行9：状态标签 =====
     statusLabel = uilabel(g, 'Text', '就绪', ...
         'FontSize', 9, 'FontColor', cfg.colors.textFaint, ...
         'HorizontalAlignment', 'center');
-    statusLabel.Layout.Row = 8;
+    statusLabel.Layout.Row = 9;
 
-    % ===== 行9：开发者信息 + 设置 =====
+    % ===== 行10：开发者信息 + 设置 =====
     foot = uigridlayout(g);
-    foot.Layout.Row = 9;
+    foot.Layout.Row = 10;
     foot.ColumnWidth = {'1x', 64};
     % 3.3.1：嵌套网格必须显式给行高并收紧 Padding，否则内部按钮被
     % 默认值挤成 0 高（实测"设置"按钮不可见）
@@ -234,8 +270,9 @@
     fig.UserData.modelLabel = modelLabel;
 
     % 3.3.0 统一日志：注册状态栏 sink——核心函数内的 WARN/ERROR 自动上屏
-    %（warn=琥珀色 error=红色）；关窗/切主题时清除（见 onClose/onToggleTheme）
-    simutidy.internal.setLogSink(@(msg, level) guiLogSink(statusLabel, msg, level));
+    %（warn=琥珀色 error=红色）；3.4.0：info 及以上同时追加进日志区；
+    % 关窗/切主题时清除（见 onClose/onToggleTheme）
+    simutidy.internal.setLogSink(@(msg, level) guiLogSink(statusLabel, msg, level, logArea));
 
     % 定时器刷新模型标签
     t = timer('ExecutionMode', 'fixedRate', 'Period', cfg.gui.refreshInterval, ...
@@ -351,9 +388,41 @@ function onHighlightUnconnected(fig)
     sl.Text = '正在高亮...'; sl.FontColor = cfg.colors.check; drawnow;
     try
         % 3.3.0 进度条：高亮逐块机制慢，GUI 路径带进度与取消
-        simutidy.highlightUnconnected([], 'Progress', fig);
+        % 3.4.0 结果反馈：接 res 弹结果面板逐条定位
+        res = simutidy.highlightUnconnected([], 'Progress', fig);
         sl.Text = '高亮完成';
         sl.FontColor = cfg.colors.success;
+        SimuTidy_resultPanel(res);
+    catch ME
+        sl.Text = ['错误: ' ME.message]; sl.FontColor = cfg.colors.error;
+    end
+end
+
+function onCheckOverlaps(fig)
+    % 3.4.0 新增：模块重叠检测（纯几何，无进度条必要）
+    sl = fig.UserData.statusLabel;
+    cfg = SimuTidy_config();
+    sl.Text = '正在检测重叠...'; sl.FontColor = cfg.colors.check; drawnow;
+    try
+        res = simutidy.checkOverlaps();
+        sl.Text = '重叠检测完成';
+        sl.FontColor = cfg.colors.success;
+        SimuTidy_resultPanel(res);
+    catch ME
+        sl.Text = ['错误: ' ME.message]; sl.FontColor = cfg.colors.error;
+    end
+end
+
+function onCheckGotoFrom(fig)
+    % 3.4.0 新增：Goto/From 配对诊断
+    sl = fig.UserData.statusLabel;
+    cfg = SimuTidy_config();
+    sl.Text = '正在诊断 Goto/From 配对...'; sl.FontColor = cfg.colors.check; drawnow;
+    try
+        res = simutidy.checkGotoFrom();
+        sl.Text = '配对诊断完成';
+        sl.FontColor = cfg.colors.success;
+        SimuTidy_resultPanel(res);
     catch ME
         sl.Text = ['错误: ' ME.message]; sl.FontColor = cfg.colors.error;
     end
@@ -416,7 +485,8 @@ function pos = loadWindowPos(cfg)
             p(3) = min(max(p(3), 420), ss(3));      % 最小宽 420
             % 3.3.1：最小高抬到 700——gridlayout 固定行高合计 ~660，
             % 旧版记忆的 620 会裁掉底部；用旧偏好的用户被自动抬到可用高度
-            p(4) = min(max(p(4), 700), ss(4));
+            % 3.4.0：700→800——新增"运行日志"区（行高合计 ~774），同理
+            p(4) = min(max(p(4), 800), ss(4));
             p(1) = min(max(p(1), 80 - p(3)), ss(3) - 80);
             p(2) = min(max(p(2), 40 - p(4)), ss(4) - 40);
             pos = p;
@@ -450,18 +520,28 @@ function refreshModelLabel(fig)
     end
 end
 
-function guiLogSink(sl, msg, level)
-%guiLogSink 3.3.0 状态栏日志接收器（经 setLogSink 注册）
-%   核心函数内部产生的 warn/error 无需经过 GUI 回调包装也能上状态栏，
-%   状态文本用完整原因，颜色按等级：warn=琥珀、error=红
-    if ~isvalid(sl), return; end
-    cfg = SimuTidy_config();
-    sl.Text = msg;
-    if strcmp(level, 'error')
-        sl.FontColor = cfg.colors.error;
-    else
-        sl.FontColor = cfg.colors.check;
+function guiLogSink(sl, msg, level, logArea)
+%guiLogSink 日志接收器（3.3.0 状态栏；3.4.0 扩展为状态栏+日志区双出口）
+%   状态栏：完整原因文本，颜色按等级（warn=琥珀、error=红，info 不动状态栏）
+%   日志区：info 及以上全部追加（新行插**顶部**——uitextarea 无自动滚动
+%   API，追加到底部时最新内容不可见；插顶保证最新明细始终可见，代价是
+%   时间倒序，为可见性取舍）。上限 200 行防无限增长
+    if nargin < 4 || ~isvalid(logArea)
+        return;
     end
+    cfg = SimuTidy_config();
+    if ~strcmp(level, 'info') && isvalid(sl)
+        sl.Text = msg;
+        if strcmp(level, 'error')
+            sl.FontColor = cfg.colors.error;
+        else
+            sl.FontColor = cfg.colors.check;
+        end
+    end
+    % 日志区追加（新行在顶），截断到 200 行
+    lines = logArea.Value;
+    if ischar(lines), lines = cellstr(lines); end
+    logArea.Value = [{sprintf('[%s] %s', upper(level), msg)}; lines(1:min(end, 199))];
 end
 
 function onToggleTheme(fig)

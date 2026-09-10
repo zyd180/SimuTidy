@@ -5,6 +5,120 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.4.0] - 2026-09-10
+
+### 新增功能
+
+- **主窗口"运行日志"区**（用户提议）：检查与诊断下方新增只读日志区，
+  自动记录每次操作完整明细（对齐基准/跳过原因/诊断发现，带
+  `[INFO]/[WARN]` 前缀）——此前这些只在 MATLAB 命令行可见，GUI 侧
+  状态栏只能看到最后一条。设计取舍：
+  - `internal.log` sink 转发范围扩为 **info 及以上**（原 warn/error），
+    `testLogSink` 同步更新
+  - **新行插顶部**：uitextarea 无自动滚动 API，追加到底部最新内容
+    不可见；插顶保证最新明细始终可见（时间倒序，为可见性取舍）
+  - 上限 200 行防无限增长；命令行输出不变；状态栏保留（负责"当前
+    结果+颜色语义"，日志区负责"历史明细"）
+  - 标题"运行日志"用 uipanel Title 固定在日志区上方（首版混在
+    textarea 首行，新行插顶后被推下去，用户反馈改面板标题）
+  - 窗口默认/最小高度 700→800（行高合计 ~760，同 3.3.1 留余量经验）
+  - 新手引导提示补充日志区说明
+
+- **检查与诊断三件套**（用户选定 1+4+2 方案，统一走"检查 → res → 结果面板逐条定位"模式）：
+  - **高亮未连接端口升级**：`highlightUnconnected` 新增可选 res 输出，
+    发现项逐条**分类**（N 个输入/输出/控制端口未连接、悬空信号线）并带
+    可定位句柄；GUI 有发现时弹结果面板逐条"定位"（命令行行为不变）；
+    顺带收敛悬空线检测的两处重复 try/catch
+  - **模块重叠检测**（新增 `simutidy.checkOverlaps` / `slCheckOverlaps`）：
+    当前层全块两两 AABB 检测（O(n²) 纯数值，实测毫秒级），发现项入
+    结果面板；复用与 `collidesAny` 同口径的相交判定
+  - **Goto/From 配对诊断**（新增 `simutidy.checkGotoFrom` /
+    `slCheckGotoFrom`）：检查悬空 Goto（全模型无 From 引用）、无源 From、
+    **跨层 local 标签引用**（local 仅本层可见，仿真报错）；刻意不做编译
+    校验，只覆盖确定性问题（同 Tag 多 Goto 等复杂语义留给仿真诊断）
+  - 结果面板新增可选 `res.okLabel`/`failLabel` 文案钩子（诊断类无
+    "失败"概念，显示"连接完好/有问题"等；缺省回落"成功/失败"兼容旧 res）
+  - GUI"检查与诊断"区改为三按钮并排（不增行高，主窗口总高不变）；
+    Tools 菜单与 Toolstrip 选项卡同步新增两项；新绘专属图标
+    `checkoverlap`（前后交叠方块）与 `checkgoto`（双标签块+箭头，
+    浅/深两套，程序化绘制进 `SimuTidy_makeIcons`），初版曾临时复用
+    highlight 图标
+- **Toolstrip 选项卡分区与主窗口对齐**（用户反馈）：原 2.7.0 布局只有
+  4 个分区（工具/模块整理/连线整理/接口与诊断）且"导出 Web 视图"
+  从未上过选项卡。重排为与 GUI 一致的 6 分区：工具 → 视图与导出
+  （新增 exportAction，配新绘 `export` 图标）→ 模块整理 → 连线整理 →
+  接口与命名 → 检查与诊断（三诊断项归位本分区）
+- 测试同步：新增 `testHighlightResClassification` / `testCheckOverlaps` /
+  `testCheckGotoFrom` 三个用例（共 25 用例）
+
+### 修复
+
+- **高亮未连接端口 GUI 路径报错**（用户点击暴露，两处）：
+  - `highlightUnconnected` 以 `([], 'Progress', fig)` 三参调用时，
+    `if nargin < 2 || isempty(clearFlag)` 左边为 false、右边读取未定义
+    的 clearFlag → 抛"函数或变量 'clearFlag' 无法识别"。3.3.0 加
+    Progress 选项引入的存量 bug（回归测试只覆盖 1/2 参调用未踩到）。
+    修复：clearFlag 默认值先于条件分支赋值
+  - 修复上条后多输入块又触发新错：`countUnconnected` 对多句柄
+    `get_param(ports, 'Line')` 直接 `== -1`——多句柄返回 **cell**
+    （与 Position 同款多值行为，`batchPositions` 归一过的同一坑），
+    抛"'cell' 类型的函数 'eq' 未定义"。修复：iscell → cell2mat 归一
+  - 进度对话框加 `onCleanup` 兜底关闭——中途报错时 uiprogressdlg
+    不再模态挂住主窗口（用户此前"卡死"的直接观感来源）
+  - 测试补 `testHighlightWithProgressOption`（Progress 路径 + 多输入
+    Logic 块 + 清除模式共存），此前只测过 1/2 参调用
+- **模块对齐/大小统一/连线端口对齐非预期行为的两处根因**（用户报告"有时出现非预期对齐"）：
+  - **等间距破坏**：`alignBlocks` 的 hspace/vspace 原实现跳过基准块——
+    等间距锚点是"中心最小/最大"两块，基准块（最上最左）在中间时被
+    跳过导致等距失效（实测 4 块间距 250/185/215），基准是唯一中间块
+    时整体空转且日志虚报调整数。修正：基准块正常参与分布；日志改报
+    实际调整数并改用锚点话术（等间距模式不适用"基准不动"承诺）
+  - **跨层选中混算**：三个功能的选中查询均不限层，父层与打开的
+    子系统窗口的选中块被混入同一坐标系计算，产生非预期大位移/改尺寸
+    （实测复现）。修正：`alignBlocks`/`uniformSize`/`alignLinePorts`
+    的选中查询统一加 `SearchDepth=1`，只处理当前层（与
+    `highlightUnconnected` 3.1.0 限层修正同一理由）
+- **基准提示增强**（用户反馈易搞不清基准是谁）：对齐/大小统一的命令行
+  日志明示"基准模块：<名字>（所选块中最上最左）"；GUI 等间距按钮
+  tooltip 注明锚点规则；新手引导使用提示补充基准与作用范围说明
+
+### 变更
+
+- **清除信号线名功能细化**（用户需求）：信号线命名对话框重排，
+  "清除所有"上方新增**"清除所选信号线命名"**按钮——只清选中的线，
+  未选中任何线时不做处理、仅 WARN 提醒（不回落全线清除）；"清除所有
+  信号线命名"改为弹窗二次确认（默认取消），确认后无视选中状态清当前
+  层级全部线（新 `clear_all` 模式，与既有 `clear` 的"选中优先"语义区分，
+  `clear` 行为不变）。配套：
+  - `simutidy.autoNameSignals` 新增 `clear_sel`/`clear_all` 两模式
+  - 新增命令行入口 `slClearSignalNames`（转 `clear_sel`）
+  - 对话框加高 50px（`cfg.gui.nameDialogPos` 350），嵌套
+    `sltidy_iif` 文案改 switch
+- 测试同步：新增 `testClearSelectedAndAllModes` 锁定三场景（选中清除/
+  零选中提醒/全部清除）
+- **生成接口命名规则**（用户需求）：`simutidy.generatePorts` 新生成的
+  Inport/Outport 块名改为优先取子系统**内部对应端口块**（按端口号匹配）
+  的名称（内部叫 Vin，父层生成块也叫 Vin），原固定 `InportN/OutportN`
+  序号命名（含跳号怪癖）废除，仅作为内部块缺失时的回落兜底保留。
+  细节：
+  - 内部名经 `internal.sanitizeName` 清洗非法字符
+  - 父层重名追加 `_1/_2` 序号（与 `updateBlockNames.renameBlock` 同策略；
+    原版"撞名即静默跳过不生成"的守卫语义随之删除）
+  - 连线改用**端口句柄** `add_line`（同 `splitGotoFrom` 3.1.0 的修复
+    原因：块名含 `/` 时路径拼接必然断线，句柄不受名称影响）
+  - 汇总日志追加本次生成的块名清单，便于核对命名结果
+  - **默认显示模块名称**：新生成块 ShowName='on' + IconDisplay='Port
+    number'（与 `updateBlockNames` 显示约定一致；原 'Signal name' 图标
+    模式在信号线未命名时图标空白，模块名不突出）
+  - **生成后的 update 受 `cfg.simulink.updateAfterChange` 门控**（与
+    `setSignalResolve` 同款写法）：该 update 只为立即刷新新端口的显示，
+    触发整模型编译在大模型上秒级、非正确性必需；默认仍开启（行为不变），
+    关闭开关即可跳过编译提速
+- 测试同步：`testGeneratePorts` 改锁新命名规则（Vin/Vout），新增
+  `testGeneratePortsConflictAndFallback` 覆盖"清洗+冲突后缀"路径
+
+---
+
 ## [3.3.1] - 2026-09-09
 
 ### 修复
