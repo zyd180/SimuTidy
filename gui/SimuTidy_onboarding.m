@@ -7,7 +7,12 @@
 %       - 主窗口通过 cfg.gui.showOnboarding 与 getpref('SimuTidy','onboarded') 判断是否自动弹出
 
     % 单例（uifigure 默认句柄隐藏，须用 findall）
+    % 3.4.1：存活标记方案（uifigure delete 异步，isvalid 过滤治不了根，
+    % 详见 SimuTidy_mainGUI 同名修复）
     d = findall(0, 'Type', 'figure', 'Name', 'SimuTidy 新手引导');
+    d = d(arrayfun(@(f) isvalid(f) && isappdata(f, 'SimuTidy_Alive') ...
+        && islogical(getappdata(f, 'SimuTidy_Alive')) ...
+        && getappdata(f, 'SimuTidy_Alive'), d));
     if ~isempty(d)
         figure(d(1));
         return;
@@ -19,6 +24,8 @@
                    'Position', [560, 220, 480, 380], ...
                    'Color', cfg.gui.bgColor, ...
                    'Resize', 'off');
+    setappdata(dlg, 'SimuTidy_Alive', true);  % 3.4.1 存活标记（见上）
+    dlg.CloseRequestFcn = @(src, ~) finish(src);
 
     % 存储向导状态
     dlg.UserData.page = 1;
@@ -82,6 +89,7 @@
     end
 
     function finish(src)
+        setappdata(src, 'SimuTidy_Alive', false);  % 3.4.1：先摘存活标记再删
         if src.UserData.noShowBox.Value
             try
                 setpref('SimuTidy', 'onboarded', true);

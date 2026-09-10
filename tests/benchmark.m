@@ -10,8 +10,10 @@
 function benchmark(N)
 if nargin < 1, N = 500; end
 root = fileparts(mfilename('fullpath'));
+% 3.4.0 清理：3.1.0 命名空间化后 core 目录已并入 +simutidy 包（随根目录
+% 在 path 上即可解析），删除残留的 core addpath
 addpath(fullfile(root, '..'), fullfile(root, '..', 'gui'), ...
-        fullfile(root, '..', 'core'), fullfile(root, '..', 'utils'));
+        fullfile(root, '..', 'utils'));
 
 mdl = 'BENCH_MODEL';
 if bdIsLoaded(mdl), bdclose(mdl); end

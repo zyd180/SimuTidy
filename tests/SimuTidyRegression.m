@@ -9,14 +9,25 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
 %     - 高亮范围在 3.1.0 修正为仅当前层，因此本套件只断言当前层
 %     - 批量操作的 fprintf 汇总文案不作断言（允许 Phase 2 收敛格式）
 
-    properties (Constant)
-        ROOT = 'F:\OpenCode\SimuTidy'
+    properties
+        ModelName = ''
+        sinkMsgs = {}   % 3.3.0 日志 sink 捕获（TestCase 是 handle 类，闭包可写回）
+        ROOT = ''       % 3.4.0 修复：改为动态解析（原 Constant 硬编码
+                        % 'F:\OpenCode\SimuTidy'，换机器/clone 到其他路径
+                        % 即挂；Constant 属性必须是常量表达式，无法在声明处
+                        % 调 mfilename，故移到 TestClassSetup 里赋值）
     end
 
     methods (TestClassSetup)
-        function addPathOnce(tc) %#ok<INUSD>
+        function addPathOnce(tc)
             % 3.1.0 命名空间化后实体在 +simutidy 包内：包无需单独加路径，
             % 根目录在 path 上即可；gui/utils 仍需单独 addpath
+            % 3.4.0 修复：根目录从本文件位置动态解析——注意两个坑（实测）：
+            % 1) mfilename 在 classdef 方法内返回**空串**，不能用于定位
+            % 2) which('SimuTidyRegression') 返回 classdef 文件全路径
+            %    （tests/ 下），需 fileparts 两次上溯到项目根
+            % 仓库 clone 到任意路径测试均可跑
+            tc.ROOT = fileparts(fileparts(which('SimuTidyRegression')));
             addpath(tc.ROOT);
             addpath(fullfile(tc.ROOT, 'gui'));
             addpath(fullfile(tc.ROOT, 'utils'));
@@ -28,11 +39,6 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
             % 所有测试模型均不保存（new_system 后从未 save），直接丢弃
             bdclose(tc.ModelName);
         end
-    end
-
-    properties
-        ModelName = ''
-        sinkMsgs = {}   % 3.3.0 日志 sink 捕获（TestCase 是 handle 类，闭包可写回）
     end
 
     methods (TestMethodSetup)
@@ -344,6 +350,67 @@ classdef SimuTidyRegression < matlab.unittest.TestCase
             tc.verifyNotEqual(srcLine, -1, 'Goto 未接线');
             dstLine = get_param(get_param(fh, 'PortHandles').Outport, 'Line');
             tc.verifyNotEqual(dstLine, -1, 'From 未接线');
+        end
+
+        function testSplitGotoFromMultiBranch(tc)
+            % 3.4.1 分支支持锁定：1 源 3 目标 → Goto ×1 + From ×3（同
+            % Tag），每个目标块仍有输入；修复前 delete_line 删整条线，
+            % 只有第一分支被拆、其余分支随原线消失
+            mdl = tc.ModelName;
+            add_block('built-in/Constant', [mdl '/C'],  'Position', [50 130 90 150]);
+            add_block('built-in/Gain',    [mdl '/D1'],  'Position', [300 50 340 70]);
+            add_block('built-in/Gain',    [mdl '/D2'],  'Position', [300 150 340 170]);
+            add_block('built-in/Gain',    [mdl '/D3'],  'Position', [300 250 340 270]);
+            add_line(mdl, 'C/1', 'D1/1', 'autorouting', 'on');
+            add_line(mdl, 'C/1', 'D2/1', 'autorouting', 'on');
+            add_line(mdl, 'C/1', 'D3/1', 'autorouting', 'on');
+            tc.selectLines();
+
+            res = simutidy.splitGotoFrom(mdl);
+            tc.verifyEqual(res.okCount, 1, '3 分支线应一次性完整拆分（去重后 1 条）');
+            tc.verifyEqual(res.failCount, 0, '空间充足不应有失败分支');
+
+            % 块清点：C/D1/D2/D3 + Goto ×1 + From ×3 = 8
+            blks = find_system(mdl, 'FindAll', 'on', 'SearchDepth', 1, 'Type', 'block');
+            tc.verifyEqual(numel(blks), 8, '应新增 Goto ×1 + From ×3');
+            gotoH = blks(strcmp(get_param(blks, 'BlockType'), 'Goto'));
+            fromH = blks(strcmp(get_param(blks, 'BlockType'), 'From'));
+            tc.verifyEqual(numel(gotoH), 1, '应只建 1 个 Goto');
+            tc.verifyEqual(numel(fromH), 3, '应建 3 个 From');
+            % Tag 全一致（get_param 多句柄返回的 cell 朝向不定，统一转列
+            % 向量再拼，规避 char/cell 与行/列双重不一致）
+            tags = [cellstr(get_param(gotoH, 'GotoTag')); ...
+                    reshape(cellstr(get_param(fromH, 'GotoTag')), [], 1)];
+            tc.verifyEqual(numel(unique(tags)), 1, 'Goto 与 3 个 From 的 GotoTag 应一致');
+
+            % 每个目标块输入线完好
+            for d = {'D1', 'D2', 'D3'}
+                ph = get_param([mdl '/' d{1}], 'PortHandles');
+                tc.verifyNotEqual(get_param(ph.Inport(1), 'Line'), -1, ...
+                    sprintf('%s 的输入线丢失', d{1}));
+            end
+            % 线数 = 源→Goto 1 + From→目标 3
+            tc.verifyEqual(numel(find_system(mdl, 'FindAll', 'on', 'Type', 'line')), 4);
+        end
+
+        function testSplitGotoTagNameCollision(tc)
+            % 3.4.1 命名规则锁定：Tag 默认 = 清洗后的源块名（无随机数）；
+            % 撞已有 Tag 时追加确定性序号 _1
+            mdl = tc.ModelName;
+            tc.addAndConnect([100 100 140 140], [500 100 540 140]);
+            % 预置一个 Tag='GainA' 的 Goto，制造撞名
+            add_block('built-in/Goto', [mdl '/G_Pre'], 'GotoTag', 'GainA', ...
+                'Position', [700 100 740 120]);
+            tc.selectLines();
+            slSplitGotoFrom(mdl);
+
+            gotoH = find_system(mdl, 'FindAll', 'on', 'SearchDepth', 1, ...
+                'BlockType', 'Goto');
+            tags = cellstr(get_param(gotoH, 'GotoTag'));
+            tc.verifyEqual(numel(tags), 2, '应共 2 个 Goto（预置 + 新建）');
+            tc.verifyTrue(any(strcmp(tags, 'GainA')), '预置 Tag 不应被改动');
+            tc.verifyTrue(any(strcmp(tags, 'GainA_1')), ...
+                '新 Goto 的 Tag 应为撞名后缀 GainA_1');
         end
 
         function testSplitErrorsWithoutSelection(tc)

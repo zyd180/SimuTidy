@@ -8,7 +8,12 @@
     end
 
     % 检查是否已有对话框打开（uifigure 默认句柄隐藏，须用 findall）
+    % 3.4.1：存活标记方案（uifigure delete 异步，isvalid 过滤治不了根，
+    % 详见 SimuTidy_mainGUI 同名修复）
     d = findall(0, 'Type', 'figure', 'Name', '信号线自动命名');
+    d = d(arrayfun(@(f) isvalid(f) && isappdata(f, 'SimuTidy_Alive') ...
+        && islogical(getappdata(f, 'SimuTidy_Alive')) ...
+        && getappdata(f, 'SimuTidy_Alive'), d));
     if ~isempty(d)
         figure(d(1));
         return;
@@ -18,12 +23,14 @@
     cfg = SimuTidy_config();
 
     % 创建对话框
-    % 3.4.0：新增"清除所选信号线命名"按钮，对话框加高 50px 容纳新按钮
+    % 3.3.2：新增"清除所选信号线命名"按钮，对话框加高 50px 容纳新按钮
     % （高度在 SimuTidy_config 的 nameDialogPos 中调整）
     dlg = uifigure('Name', '信号线自动命名', ...
                    'Position', cfg.gui.nameDialogPos, ...
                    'Color', cfg.gui.bgColor, ...
                    'Resize', 'off');
+    setappdata(dlg, 'SimuTidy_Alive', true);  % 3.4.1 存活标记（见上）
+    dlg.CloseRequestFcn = @(src, ~) closeNameDialog(src);
 
     % 命名方式标题
     uilabel(dlg, 'Text', '命名方式', ...
@@ -63,7 +70,13 @@
     uibutton(dlg, 'push', 'Text', '关闭', ...
         'Position', [110, 14, 100, 30], 'FontSize', 11, ...
         'BackgroundColor', cfg.colors.btnGrey, 'FontColor', [1 1 1], ...  % 3.2.0 色值入调色板
-        'ButtonPushedFcn', @(~,~) close(dlg));
+        'ButtonPushedFcn', @(~,~) closeNameDialog(dlg));
+end
+
+function closeNameDialog(d)
+%closeNameDialog 关闭路径统一摘存活标记再删（3.4.1，见 SimuTidy_mainGUI）
+    setappdata(d, 'SimuTidy_Alive', false);
+    delete(d);
 end
 
 function confirmClearAll(parentFig, dlg)

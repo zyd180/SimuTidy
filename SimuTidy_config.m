@@ -7,7 +7,7 @@ function cfg = SimuTidy_config()
     persistent warnedBad   % 用户配置解析失败的"只告警一次"标志（函数顶部声明）
 
     %% 版本信息
-    cfg.version = '3.4.0';
+    cfg.version = '3.4.1';
     cfg.versionDate = '2026-09-10';
     
     %% Goto/From模块配置

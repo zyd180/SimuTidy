@@ -15,7 +15,16 @@
 %   回调与核心调用逻辑不变，仅容器换血。
 
     % 检查是否已有窗口打开（uifigure 默认句柄隐藏，须用 findall）
+    % 3.4.1 修复：uifigure 的 delete 是**异步**的——刚关闭的窗口会短暂
+    % 残留在 findall 结果里且 isvalid 仍为 true（异步中间态），单例检查
+    % 直接返回会把死窗口交给用户（"关窗立刻重开"必现；isvalid 过滤
+    % 治不了根，实测）。改为**存活标记**方案：创建时打
+    % 'SimuTidy_Alive'=true，关闭路径先摘标再 delete，单例只认有标记的
+    % 窗口——不依赖异步销毁时机，确定性行为
     fig = findall(0, 'Type', 'figure', 'Name', 'SimuTidy');
+    fig = fig(arrayfun(@(f) isvalid(f) && isappdata(f, 'SimuTidy_Alive') ...
+        && islogical(getappdata(f, 'SimuTidy_Alive')) ...
+        && getappdata(f, 'SimuTidy_Alive'), fig));
     if ~isempty(fig)
         figure(fig(1));
         return;
@@ -28,6 +37,7 @@
                    'Position', loadWindowPos(cfg), ...
                    'Color', cfg.gui.bgColor, ...
                    'WindowStyle', 'normal');
+    setappdata(fig, 'SimuTidy_Alive', true);  % 3.4.1 存活标记（见上）
 
     g = uigridlayout(fig);
     g.ColumnWidth = {'1x'};
@@ -556,6 +566,7 @@ function onToggleTheme(fig)
     catch
     end
     saveWindowPos(fig);   % 3.3.0：重建前记住当前位置/尺寸
+    setappdata(fig, 'SimuTidy_Alive', false);  % 3.4.1：先摘存活标记再删
     t = fig.UserData.timer;
     if isvalid(t)
         try, stop(t); catch, end
@@ -568,6 +579,7 @@ end
 
 function onClose(fig, t)
     saveWindowPos(fig);   % 3.3.0：记住窗口位置/尺寸
+    setappdata(fig, 'SimuTidy_Alive', false);  % 3.4.1：先摘存活标记再删
     if isvalid(t)
         try, stop(t); catch, end
         try, delete(t); catch, end

@@ -5,6 +5,76 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.4.1] - 2026-09-10
+
+### 新增功能
+
+- **拆分 Goto/From 的 Tag 命名可读化**（用户反馈）：Tag 不再加 3 位
+  随机数（原 `GainA_047` 不可读），默认直接用清洗后的源信号名（即
+  `GainA`）；撞当前层已有 Tag 时追加 `_1/_2` 确定性序号。随机数的
+  初衷是防同名撞车（同 Tag 多 Goto 会让 From 连错、编译报错），查重
+  后缀同样不撞且可读；查重范围限当前层（TagVisibility 默认 local 仅
+  本层可见，极端跨层撞名场景留给编译诊断兜底）。测试：
+  `testSplitGotoTagNameCollision`（预置同 Tag Goto → 新建为 `GainA_1`）
+- **拆分 Goto/From 支持分支线**（用户需求，原 §12.2 已知限制废除）：
+  一条线分出多个目标时，Goto 只建 1 个（源端），每个可行分支各建 1 个
+  From（同 GotoTag，多 From 合法）；空间不足的分支**保留原连线不动**
+  （部分拆分计入失败侧说明），全部分支放不下才整线跳过。核心依据
+  （实验确认）：`delete_line(源端口, 目标端口)` 按端口对只删单条分支，
+  其余分支保留。实现细节：
+  - 选中线按**源端口分组并 union 同源全部记录的目标**：分支线在
+    find_system 中返回主/支多条 line 记录（同一物理线），且记录结构因
+    模型而异——新模型常合并为"1 条主线带 N 个 dst"，老模型可能存为
+    "同源的多条独立记录、每条 1 dst"（用户实测复现：只按单条记录拆
+    会漏掉其余分支，表现为"只有第一条被替换"）。Points 取 dst 最多
+    的记录（主线，路径点最完整）
+  - 各分支端点 y 取**目标端口坐标**（分支线 Points 只含主线路径）；
+    From 碰撞排除本分支两端块及已可行的其他 From（分支相邻时 From
+    可能互相压叠）
+  - 推块/走廊逻辑保持只服务 Goto 侧，From 逐分支独立预算
+  - 行为收紧（有意变更）：无推块路径的 From 位置现在也过碰撞检查
+    （原先静默允许压叠）
+  - 测试：`testSplitGotoFromMultiBranch`（1 源 3 目标 → Goto ×1 +
+    From ×3、Tag 一致、各目标输入完好、线数 4）
+- **GUI 冒烟测试**（新增 `tests/SimuTidyGUISmoke.m`，2 用例）：裁切
+  bug 连续三版出现在主窗口而回归套件对 GUI 零覆盖。断言口径刻意
+  收窄（防误伤）：
+  - 只断言**分配格尺寸算术一致性**（grid 行高合计 vs 窗口高度）与
+    控件齐全性，不猜渲染像素——uifigure 布局异步，程序化读 Position
+    判断"被裁"不可靠（3.3.1 教训）
+  - uifigure 创建失败走 **assume 跳过**（无头/旧版兼容，不挂部署门禁）
+  - 清理是生死线：主窗口 timer 必须 stop/delete，否则 -batch 进程不退
+    （closeAllTidyWindows 统一兜底）
+  - 实测踩坑记录：面板标题带装饰空格须 strtrim 比对；cellfun 不能
+    直接用于图形对象数组（用 arrayfun）；`SimuTidy_nameDialog` 无输出
+    参数（经 findall 定位单例）；**findall(fig对象) 不遍历 uifigure
+    子组件**（实测返回 0 后代，须 findall(0,...) 全局找再按所属窗口
+    过滤）；部分 MATLAB 会话里 uifigure 创建后 ~1s **自动关闭**
+    （裸窗口亦然，自动化/无头渲染环境特性）——`assumeStable` 探测后
+    按假设跳过，真实桌面环境正常执行
+
+### 修复
+
+- **主窗口/对话框单例返回死窗口**（"关窗立刻重开"必现）：uifigure 的
+  `delete` 是**异步**的——刚关闭的窗口短暂残留在 findall 结果里且
+  `isvalid` 仍为 true（异步中间态），单例检查直接把它返回给用户。
+  isvalid 过滤治不了根（实测），改为**存活标记**方案：创建时打
+  `SimuTidy_Alive`=true，关闭路径（onClose/onToggleTheme/对话框
+  CloseRequestFcn/关闭按钮）先摘标再 delete，单例只认有标记的窗口。
+  涉及 SimuTidy_mainGUI / SimuTidy_nameDialog / SimuTidy_onboarding
+- **测试套件移植性**：`SimuTidyRegression` 的根目录原为 Constant 硬编码
+  `'F:\OpenCode\SimuTidy'`——clone 到其他路径测试即挂（公开仓库后他人
+  无法跑部署门禁）。改为 TestClassSetup 内从本文件位置动态解析。
+  踩坑记录（写给后续改测试的人）：① Constant 属性必须是常量表达式，
+  不能在声明处调函数；② `mfilename` 在 classdef 方法内返回**空串**，
+  需用 `which('SimuTidyRegression')` 定位文件再 fileparts 两次上溯到
+  项目根；③ 坑②曾靠"当前目录恰好在项目内"掩盖，验证移植性必须把
+  当前目录切到项目外再跑
+- **benchmark.m 残留清理**：addpath 列表还留着 3.1.0 已并入包的
+  `core` 目录，删除
+
+## [3.4.0] - 2026-09-10
+
 ## [3.4.0] - 2026-09-10
 
 ### 新增功能
